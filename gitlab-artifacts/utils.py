@@ -45,3 +45,6 @@ def humanize_size(size):
         size = size / 1024
 
     return size_format.format(size, "GiB")
+
+def humanize_datetime(datetime):
+    return datetime.date().isoformat() + " " + datetime.strftime('%X')
