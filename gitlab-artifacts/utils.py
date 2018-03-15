@@ -12,13 +12,13 @@ def tabulate(rows, sortby=None):
 
 def print_row(row, col_sizes):
     for i, col in enumerate(row):
-        print(str(col).ljust(col_sizes[i]+2), end="")
+        print(str(col).ljust(col_sizes[i]), end="")
     print("")
 
 def print_spacer(col_sizes):
     spacer = []
     for c in col_sizes:
-        spacer.append("-"*c)
+        spacer.append("-"*(c-1))
     print_row(spacer, col_sizes)
 
 def autosize(rows):
@@ -30,8 +30,8 @@ def autosize(rows):
 
         for i, col in enumerate(r):
             col = str(col)
-            if len(col) > sizes[i]:
-                sizes[i] = len(col)
+            if len(col) >= sizes[i]:
+                sizes[i] = len(col)+1
 
     return sizes
 
