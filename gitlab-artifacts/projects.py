@@ -47,10 +47,9 @@ def list_projects(db):
     
     return cur.fetchall()
 
-def list_artifacts(db, project_path):
-    project_id = find_project(db, project_path)
+def list_artifacts(db, project_ids):
     cur = db.cursor(cursor_factory=psycopg2.extras.DictCursor)
-    cur.execute(sql_get_artifacts, dict(project_id=project_id))
+    cur.execute(sql_get_artifacts, dict(project_id=tuple(project_ids)))
 
     return cur.fetchall()
 
@@ -66,12 +65,12 @@ group by a.project_id, p.name, n.name
 sql_get_artifacts = """
 select a.size, b.name, b.status, b.tag,
     p.created_at as scheduled_at, b.created_at as built_at,
-    a.expire_at as expire_at
+    b.artifacts_expire_at as expire_at
 from ci_job_artifacts as a
 inner join ci_builds as b on b.id=a.job_id
 inner join ci_stages as s on s.id=b.stage_id
 inner join ci_pipelines as p on p.id=s.pipeline_id
-where a.project_id=%(project_id)s and a.file_type=1
+where a.project_id IN %(project_id)s and a.file_type=1
 """
 
 
