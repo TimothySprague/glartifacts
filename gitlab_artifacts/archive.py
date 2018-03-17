@@ -13,6 +13,16 @@ class ArchiveStrategy(enum.Enum):
     # Keep good artifacts per-pipeline
     LASTGOOD_PIPELINE = 2
 
+    def __str__(self):
+        return self.name
+
+    @staticmethod
+    def parse(value):
+        try:
+            return ArchiveStrategy[value]
+        except KeyError:
+            return None
+
 def get_archive_strategy_query(strategy):
     if strategy == ArchiveStrategy.LASTGOOD_BUILD:
         return Query.lastgood.format(Query.good_build)
@@ -21,7 +31,7 @@ def get_archive_strategy_query(strategy):
 
     raise Exception("Strategy {} not implemented".format(strategy.name))
 
-def list_archive_artifacts(db, project_id, strategy=ArchiveStrategy.LASTGOOD_BUILD):
+def list_archive_artifacts(db, project_id, strategy):
     strategy_query = get_archive_strategy_query(strategy)
     action_query = Query.artifact_list.format(Query.identify_artifacts)
     sql = strategy_query + action_query
@@ -32,7 +42,7 @@ def list_archive_artifacts(db, project_id, strategy=ArchiveStrategy.LASTGOOD_BUI
 
     return cur.fetchall()
 
-def archive_artifacts(db, project_ids, strategy=ArchiveStrategy.LASTGOOD_BUILD):
+def archive_artifacts(db, project_ids, strategy):
     strategy_query = get_archive_strategy_query(strategy)
     action_query = Query.artifact_expire.format(Query.identify_artifacts)
 

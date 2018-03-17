@@ -10,7 +10,7 @@ import psycopg2.extras
 from . import log
 from .errors import GitlabArtifactsError, NoProjectError
 from .projects import find_project, list_projects, list_artifacts
-from .archive import list_archive_artifacts, archive_artifacts
+from .archive import list_archive_artifacts, archive_artifacts, ArchiveStrategy
 from .utils import tabulate, humanize_size, humanize_datetime
 
 def switch_user():
@@ -62,7 +62,13 @@ def get_args(db):
         '--dry-run',
         action="store_true",
         help='Only print the artifacts that would be archived')
-
+    archivecmd.add_argument(
+        '-s', '--strategy',
+        type=ArchiveStrategy.parse,
+        choices=list(ArchiveStrategy),
+        default=ArchiveStrategy.LASTGOOD_BUILD,
+        help='Select the archive strategy used to identify old artifacts',
+        )
     args = parser.parse_args()
 
     if args.debug:
@@ -136,10 +142,14 @@ def main():
             show_projects(gitlab)
     elif args.command == 'archive':
         if args.dry_run:
-            artifacts = list_archive_artifacts(gitlab, args.projects.keys())
+            artifacts = list_archive_artifacts(
+                gitlab,
+                args.projects.keys(),
+                args.strategy
+                )
             show_artifacts(args.projects.values(), artifacts, "expired artifacts")
         else:
-            archive_artifacts(gitlab, args.projects.keys())
+            archive_artifacts(gitlab, args.projects.keys(), args.strategy)
             gitlab.commit()
 
     return 0
