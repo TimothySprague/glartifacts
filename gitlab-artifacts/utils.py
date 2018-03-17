@@ -31,7 +31,7 @@ def autosize(rows):
     sizes = []
     for r in rows:
         col_count = len(r) - len(sizes)
-        if col_count>0:
+        if col_count > 0:
             sizes.extend([0]*col_count)
 
         for i, col in enumerate(r):
@@ -41,10 +41,9 @@ def autosize(rows):
 
     return sizes
 
-storage_units = ['B', 'KiB', 'MiB']
-size_format = '{:.2f} {}'
 def humanize_size(size):
-    for unit in storage_units:
+    size_format = '{:.2f} {}'
+    for unit in ['B', 'KiB', 'MiB']:
         if size < 1024:
             return size_format.format(size, unit)
 

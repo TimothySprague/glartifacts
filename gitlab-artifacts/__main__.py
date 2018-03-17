@@ -1,10 +1,11 @@
 import argparse
 import logging
 import os
-import psycopg2
-import psycopg2.extras
 import pwd
 import sys
+
+import psycopg2
+import psycopg2.extras
 
 from . import log
 from .errors import GitlabArtifactsError, NoProjectError
@@ -28,44 +29,41 @@ def resolve_project(db):
                 except NoProjectError:
                     log.error("No project was found with the path %s", project_path)
                     return 1
-            setattr(args,self.dest, projects)
+            setattr(args, self.dest, projects)
     return ResolveProject
 
 def get_args(db):
     parser = argparse.ArgumentParser(description='GitLab Artifact Archiver')
     parser.add_argument(
-            '-d', '--debug',
-            action="store_true",
-            help="Show detailed debug information")
+        '-d', '--debug',
+        action="store_true",
+        help="Show detailed debug information")
     parser.add_argument(
-            '-v', '--verbose',
-            action="store_true",
-            help="Show additional information")
+        '-v', '--verbose',
+        action="store_true",
+        help="Show additional information")
 
     commands = parser.add_subparsers(dest='command', metavar='COMMAND')
     commands.required = True
     listcmd = commands.add_parser("list")
     listcmd.add_argument(
-            "projects",
-             nargs='*',
-             action=resolve_project(db),
-             help='Project path whose artifacts will be listed')
+        "projects",
+        nargs='*',
+        action=resolve_project(db),
+        help='Project path whose artifacts will be listed')
 
     archivecmd = commands.add_parser("archive")
     archivecmd.add_argument(
-            'projects',
-            nargs='+',
-            action=resolve_project(db),
-            help='Paths to the projects to archive')
+        'projects',
+        nargs='+',
+        action=resolve_project(db),
+        help='Paths to the projects to archive')
     archivecmd.add_argument(
-            '--dry-run',
-            action="store_true",
-            help='Only print the artifacts that would be archived')
+        '--dry-run',
+        action="store_true",
+        help='Only print the artifacts that would be archived')
 
-    try:
-        args = parser.parse_args()
-    except:
-        return None
+    args = parser.parse_args()
 
     if args.debug:
         log.setLevel(logging.DEBUG)
@@ -80,13 +78,12 @@ def show_projects(db):
         rows.append([
             '/'.join([p['namespace'], p['project']]),
             p['artifact_count']
-            ]
-        )
-    tabulate(rows, sortby=dict(key=lambda r:r[0]))
+            ])
+    tabulate(rows, sortby=dict(key=lambda r: r[0]))
 
     return 0
 
-def show_artifacts(db, project_paths, artifacts, scope):
+def show_artifacts(project_paths, artifacts, scope):
     projects = ", ".join(sorted(project_paths))
     if not len(artifacts):
         raise GitlabArtifactsError("No "+scope+" were found for "+projects)
@@ -104,53 +101,53 @@ def show_artifacts(db, project_paths, artifacts, scope):
             humanize_size(r['size'])
             ])
     tabulate(rows, sortby=[
-        dict(key=lambda r:(r[0], r[1])),
-        dict(key=lambda r:(r[2]), reverse=True)
+        dict(key=lambda r: (r[0], r[1])),
+        dict(key=lambda r: (r[2]), reverse=True)
         ])
 
     return 0
 
 def main():
     logging.basicConfig(
-            stream=sys.stderr,
-            level=logging.WARN,
-            format='%(levelname)s: %(message)s')
+        stream=sys.stderr,
+        level=logging.WARN,
+        format='%(levelname)s: %(message)s')
     try:
         switch_user()
-    except:
+    except PermissionError:
         log.error("Unable to switch to gitlab-psql user")
         return 1
 
     gitlab = psycopg2.connect(
-                 database="gitlabhq_production",
-                 user="gitlab-psql",
-                 host="/var/opt/gitlab/postgresql",
-                 port="5432")
+        database="gitlabhq_production",
+        user="gitlab-psql",
+        host="/var/opt/gitlab/postgresql",
+        port="5432")
 
     args = get_args(gitlab)
     if not args:
         return 1
 
     if args.command == 'list':
-        if (args.projects):
+        if args.projects:
             artifacts = list_artifacts(gitlab, args.projects.keys())
-            show_artifacts(gitlab, args.projects.values(), artifacts, "artifacts")
+            show_artifacts(args.projects.values(), artifacts, "artifacts")
         else:
             show_projects(gitlab)
     elif args.command == 'archive':
         if args.dry_run:
             artifacts = list_archive_artifacts(gitlab, args.projects.keys())
-            show_artifacts(gitlab, args.projects.values(), artifacts, "expired artifacts")
+            show_artifacts(args.projects.values(), artifacts, "expired artifacts")
         else:
             archive_artifacts(gitlab, args.projects.keys())
             gitlab.commit()
 
     return 0
 
-if __name__=='__main__':
+if __name__ == '__main__':
     try:
         main()
-    except:
+    except Exception:  # pylint: disable=broad-except
         log.error(sys.exc_info()[1])
         sys.exit(1)
 

@@ -1,31 +1,29 @@
-import argparse
-import os
+import enum
+
 import psycopg2
 import psycopg2.extras
-import pwd
 
-from enum import Enum
 from . import log
 from .utils import indent
 
-class ArchiveStrategy(Enum):
+class ArchiveStrategy(enum.Enum):
     # Keep good artifacts per-build
-    LASTGOOD_BUILD=1
+    LASTGOOD_BUILD = 1
 
     # Keep good artifacts per-pipeline
-    LASTGOOD_PIPELINE=2
+    LASTGOOD_PIPELINE = 2
 
 def get_archive_strategy_query(strategy):
     if strategy == ArchiveStrategy.LASTGOOD_BUILD:
-        return sql_lastgood.format(sql_good_build)
+        return Query.lastgood.format(Query.good_build)
     elif strategy == ArchiveStrategy.LASTGOOD_PIPELINE:
-        return sql_lastgood.format(sql_good_pipeline)
+        return Query.lastgood.format(Query.good_pipeline)
 
     raise Exception("Strategy {} not implemented".format(strategy.name))
 
 def list_archive_artifacts(db, project_id, strategy=ArchiveStrategy.LASTGOOD_BUILD):
     strategy_query = get_archive_strategy_query(strategy)
-    action_query = sql_artifact_list.format(sql_identify_artifacts)
+    action_query = Query.artifact_list.format(Query.identify_artifacts)
     sql = strategy_query + action_query
     log.debug("Running %s archive query:\n  %s", strategy.name, indent(sql))
 
@@ -36,7 +34,7 @@ def list_archive_artifacts(db, project_id, strategy=ArchiveStrategy.LASTGOOD_BUI
 
 def archive_artifacts(db, project_ids, strategy=ArchiveStrategy.LASTGOOD_BUILD):
     strategy_query = get_archive_strategy_query(strategy)
-    action_query = sql_artifact_expire.format(sql_identify_artifacts)
+    action_query = Query.artifact_expire.format(Query.identify_artifacts)
 
     sql = strategy_query + action_query
     log.debug("Running %s archive query:\n  %s", strategy.name, indent(sql))
@@ -44,9 +42,9 @@ def archive_artifacts(db, project_ids, strategy=ArchiveStrategy.LASTGOOD_BUILD):
     cur = db.cursor()
     cur.execute(sql, dict(project_id=tuple(project_ids)))
 
-
-# Find the date of the most recent good pipeline and build
-sql_lastgood = """
+class Query():
+    # Find the date of the most recent good pipeline and build
+    lastgood = """
 with lastgood as (
     select b.project_id, b.name,
             max(p.created_at) as pipeline_date,
@@ -60,17 +58,17 @@ with lastgood as (
 )
 """
 
-# Criteria that define "good" for Build or Pipeline
-sql_good_build = "(b.status='success' or b.allow_failure)"
-sql_good_pipeline = "(p.status='success')"
+    # Criteria that define "good" for Build or Pipeline
+    good_build = "(b.status='success' or b.allow_failure)"
+    good_pipeline = "(p.status='success')"
 
-# Identifies old artifacts based on a lastgood strategy
-# "old" is defined as:
-#    Older than the lastgood build or pipeline
-#    Not tagged
-#    Not already expired
-#    Has artifacts file_type=1 (zip)
-sql_identify_artifacts = """
+    # Identifies old artifacts based on a lastgood strategy
+    # "old" is defined as:
+    #    Older than the lastgood build or pipeline
+    #    Not tagged
+    #    Not already expired
+    #    Has artifacts file_type=1 (zip)
+    identify_artifacts = """
 from lastgood
 join ci_builds as b on b.project_id=lastgood.project_id and b.name=lastgood.name
 join ci_stages as s on s.id=b.stage_id
@@ -83,20 +81,18 @@ where b.created_at<lastgood.build_date
     and a.file_type = 1
 """
 
-# Wrapper that lists identified artifacts
-sql_artifact_list = """
+    # Wrapper that lists identified artifacts
+    artifact_list = """
 select a.size, b.name, b.status, b.tag,
     p.created_at as scheduled_at, b.created_at as built_at,
     b.artifacts_expire_at as expire_at
 {}
 """
 
-# Wrapper that sets artifact expiration on identified artifacts
-sql_artifact_expire = """
+    # Wrapper that sets artifact expiration on identified artifacts
+    artifact_expire = """
 update ci_builds as target
 set artifacts_expire_at=(now() at time zone 'utc')
 {}
     and target.id=b.id
 """
-
-
