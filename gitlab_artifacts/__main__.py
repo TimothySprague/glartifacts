@@ -92,7 +92,8 @@ def show_projects(db):
 def show_artifacts(project_paths, artifacts, scope):
     projects = ", ".join(sorted(project_paths))
     if not len(artifacts):
-        raise GitlabArtifactsError("No "+scope+" were found for "+projects)
+        print("No "+scope+" were found for "+projects)
+        return 1
 
     print("Listing", scope, "for", projects, "\n")
     rows = [['Job', 'Scheduled At', 'Built At', 'Status', 'Tag?', 'Expiring?', 'Size']]
