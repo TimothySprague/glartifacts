@@ -1,3 +1,9 @@
+def indent(val, amount=2):
+    if not val:
+        return val
+    space = " "*amount
+    return val.strip().replace("\n", "\n"+space)
+
 def tabulate(rows, sortby=None):
     col_sizes = autosize(rows)
     print_row(rows.pop(0), col_sizes)

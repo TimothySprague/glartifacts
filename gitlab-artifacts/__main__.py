@@ -26,7 +26,7 @@ def resolve_project(db):
                     pid = find_project(db, project_path)
                     projects[pid] = project_path
                 except NoProjectError:
-                    log.error("No project was found with the path {}", project_path)
+                    log.error("No project was found with the path %s", project_path)
                     return 1
             setattr(args,self.dest, projects)
     return ResolveProject

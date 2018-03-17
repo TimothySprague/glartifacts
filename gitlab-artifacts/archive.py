@@ -4,37 +4,52 @@ import psycopg2
 import psycopg2.extras
 import pwd
 
-LASTKNOWNGOOD_BUILD=1
-LASTKNOWNGOOD_PIPELINE=2
+from enum import Enum
+from . import log
+from .utils import indent
+
+class ArchiveStrategy(Enum):
+    # Keep good artifacts per-build
+    LASTGOOD_BUILD=1
+
+    # Keep good artifacts per-pipeline
+    LASTGOOD_PIPELINE=2
 
 def get_archive_strategy_query(strategy):
-    if strategy == LASTKNOWNGOOD_BUILD:
-        return sql_lkg_build
+    if strategy == ArchiveStrategy.LASTGOOD_BUILD:
+        return sql_lastgood_build
+    elif strategy == ArchiveStrategy.LASTGOOD_PIPELINE:
+        return sql_lastgood_pipeline
 
-    raise Exception("Strategy {} not implemented".format(strategy))
+    raise Exception("Strategy {} not implemented".format(strategy.name))
 
-def list_archive_artifacts(db, project_id, archive_strategy=LASTKNOWNGOOD_BUILD):
-    strategy_query = get_archive_strategy_query(archive_strategy)
+def list_archive_artifacts(db, project_id, strategy=ArchiveStrategy.LASTGOOD_BUILD):
+    strategy_query = get_archive_strategy_query(strategy)
     action_query = sql_artifact_list.format(sql_artifacts)
     sql = strategy_query + action_query
+    log.debug("Running %s archive query:\n  %s", strategy.name, indent(sql))
+
     cur = db.cursor(cursor_factory=psycopg2.extras.DictCursor)
     cur.execute(sql, dict(project_id=tuple(project_id)))
 
     return cur.fetchall()
 
-def archive_artifacts(db, project_ids, archive_strategy=LASTKNOWNGOOD_BUILD):
-    strategy_query = get_archive_strategy_query(archive_strategy)
+def archive_artifacts(db, project_ids, strategy=ArchiveStrategy.LASTGOOD_BUILD):
+    strategy_query = get_archive_strategy_query(strategy)
     action_query = sql_artifact_expire.format(sql_artifacts)
 
     sql = strategy_query + action_query
+    log.debug("Running %s archive query:\n  %s", strategy.name, indent(sql))
+
     cur = db.cursor()
     cur.execute(sql, dict(project_id=tuple(project_ids)))
 
-sql_lkg_pipeline = """
-with lkg as (
+# Archive artifacts older than the most recent successful pipeline
+sql_lastgood_pipeline = """
+with lastgood as (
     select b.project_id, b.name,
-            max(p.created_at) as last_pipeline, 
-	    max(b.created_at) as last_build
+            max(p.created_at) as pipeline_date, 
+	    max(b.created_at) as build_date
     from ci_builds as b
     join ci_stages as s on s.id=b.stage_id
     join ci_pipelines as p on p.id=s.pipeline_id
@@ -46,11 +61,12 @@ with lkg as (
 )
 """
 
-sql_lkg_build = """
-with lkg as (
+# Archive artifacts older than the most recent successful job
+sql_lastgood_build = """
+with lastgood as (
     select b.project_id, b.name,
-            max(p.created_at) as last_pipeline, 
-            max(b.created_at) as last_build
+            max(p.created_at) as pipeline_date, 
+            max(b.created_at) as build_date
     from ci_builds as b
     join ci_stages as s on s.id=b.stage_id
     join ci_pipelines as p on p.id=s.pipeline_id
@@ -77,13 +93,13 @@ set artifacts_expire_at=(now() at time zone 'utc')
 """
 
 sql_artifacts = """
-from lkg
-join ci_builds as b on b.project_id=lkg.project_id and b.name=lkg.name
+from lastgood
+join ci_builds as b on b.project_id=lastgood.project_id and b.name=lastgood.name
 join ci_stages as s on s.id=b.stage_id
 join ci_pipelines as p on p.id=s.pipeline_id
 join ci_job_artifacts as a on a.job_id=b.id
-where b.created_at<lkg.last_build
-    and p.created_at<=lkg.last_pipeline
+where b.created_at<lastgood.build_date
+    and p.created_at<=lastgood.pipeline_date
     and b.artifacts_expire_at is null
     and b.tag = false
     and a.file_type = 1
