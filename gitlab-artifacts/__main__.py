@@ -59,7 +59,7 @@ def get_args(db):
             help='Paths to the projects to archive')
     archivecmd.add_argument(
             '--dry-run',
-            action="store_true", 
+            action="store_true",
             help='Only print the artifacts that would be archived')
 
     try:
@@ -112,7 +112,7 @@ def show_artifacts(db, project_paths, artifacts, scope):
 
 def main():
     logging.basicConfig(
-            stream=sys.stderr, 
+            stream=sys.stderr,
             level=logging.WARN,
             format='%(levelname)s: %(message)s')
     try:
@@ -153,5 +153,5 @@ if __name__=='__main__':
     except:
         log.error(sys.exc_info()[1])
         sys.exit(1)
-    
+
     sys.exit(0)

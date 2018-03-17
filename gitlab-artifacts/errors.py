@@ -3,4 +3,3 @@ class GitlabArtifactsError(Exception):
 
 class NoProjectError(GitlabArtifactsError):
     pass
-

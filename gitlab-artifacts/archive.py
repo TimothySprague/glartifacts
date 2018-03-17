@@ -44,16 +44,17 @@ def archive_artifacts(db, project_ids, strategy=ArchiveStrategy.LASTGOOD_BUILD):
     cur = db.cursor()
     cur.execute(sql, dict(project_id=tuple(project_ids)))
 
+
 # Find the date of the most recent good pipeline and build
 sql_lastgood = """
 with lastgood as (
     select b.project_id, b.name,
-            max(p.created_at) as pipeline_date, 
+            max(p.created_at) as pipeline_date,
             max(b.created_at) as build_date
     from ci_builds as b
     join ci_stages as s on s.id=b.stage_id
     join ci_pipelines as p on p.id=s.pipeline_id
-    where b.project_id in %(project_id)s and 
+    where b.project_id in %(project_id)s and
         {}
     group by b.name, b.project_id
 )

@@ -44,7 +44,7 @@ def find_project(db, project_path):
 def list_projects(db):
     cur = db.cursor(cursor_factory=psycopg2.extras.DictCursor)
     cur.execute(sql_projects_with_artifacts)
-    
+
     return cur.fetchall()
 
 def list_artifacts(db, project_ids):
@@ -54,7 +54,7 @@ def list_artifacts(db, project_ids):
     return cur.fetchall()
 
 sql_projects_with_artifacts = """
-select a.project_id, p.name as project, n.name as namespace, 
+select a.project_id, p.name as project, n.name as namespace,
     count(distinct a.job_id) as artifact_count
 from ci_job_artifacts as a
 inner join projects as p on p.id=a.project_id
@@ -82,5 +82,3 @@ sql_get_project = """
     select id from projects where name=%(name)s and
         (%(parent_id)s is null or namespace_id=%(parent_id)s)
 """
-
-
