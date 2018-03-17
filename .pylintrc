@@ -1,11 +1,11 @@
 [MESSAGES CONTROL]
-include-ids=no
 
 ## Complaints I judge irrelevant
-disable=locally-disabled,too-few-public-methods
-
+##    docstrings disabled temporarily
+disable=locally-disabled,too-few-public-methods,missing-docstring
 
 [BASIC]
+
 ## I refuse to use ind, err, and fobj instead of i, e, and f
 variable-rgx=[a-z_][a-z0-9_]{0,30}$
 
