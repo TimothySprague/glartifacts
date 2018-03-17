@@ -1,10 +1,12 @@
 import argparse
+import logging
 import os
 import psycopg2
 import psycopg2.extras
 import pwd
 import sys
 
+from . import log
 from .errors import GitlabArtifactsError, NoProjectError
 from .projects import find_project, list_projects, list_artifacts
 from .archive import list_archive_artifacts, archive_artifacts
@@ -24,15 +26,24 @@ def resolve_project(db):
                     pid = find_project(db, project_path)
                     projects[pid] = project_path
                 except NoProjectError:
-                    print("No project was found with the path {}".format(project_path))
+                    log.error("No project was found with the path {}", project_path)
                     return 1
             setattr(args,self.dest, projects)
     return ResolveProject
 
 def get_args(db):
     parser = argparse.ArgumentParser(description='GitLab Artifact Archiver')
-    commands = parser.add_subparsers(dest='command', metavar='COMMAND')
+    parser.add_argument(
+            '-d', '--debug',
+            action="store_true",
+            help="Show detailed debug information")
+    parser.add_argument(
+            '-v', '--verbose',
+            action="store_true",
+            help="Show additional information")
 
+    commands = parser.add_subparsers(dest='command', metavar='COMMAND')
+    commands.required = True
     listcmd = commands.add_parser("list")
     listcmd.add_argument(
             "projects",
@@ -51,7 +62,17 @@ def get_args(db):
             action="store_true", 
             help='Only print the artifacts that would be archived')
 
-    return parser.parse_args()
+    try:
+        args = parser.parse_args()
+    except:
+        return None
+
+    if args.debug:
+        log.setLevel(logging.DEBUG)
+    elif args.verbose:
+        log.setLevel(logging.INFO)
+
+    return args
 
 def show_projects(db):
     rows = [['Project', 'Jobs with Artifacts']]
@@ -65,12 +86,12 @@ def show_projects(db):
 
     return 0
 
-def show_artifacts(db, project_paths, artifacts, reason):
+def show_artifacts(db, project_paths, artifacts, scope):
     projects = ", ".join(sorted(project_paths))
     if not len(artifacts):
-        raise GitlabArtifactsError("No artifacts were found for "+projects)
+        raise GitlabArtifactsError("No "+scope+" were found for "+projects)
 
-    print("Listing", reason, "for", projects, "\n")
+    print("Listing", scope, "for", projects, "\n")
     rows = [['Job', 'Scheduled At', 'Built At', 'Status', 'Tag?', 'Expiring?', 'Size']]
     for r in artifacts:
         rows.append([
@@ -90,10 +111,14 @@ def show_artifacts(db, project_paths, artifacts, reason):
     return 0
 
 def main():
+    logging.basicConfig(
+            stream=sys.stderr, 
+            level=logging.WARN,
+            format='%(levelname)s: %(message)s')
     try:
         switch_user()
     except:
-        print("Unable to switch to gitlab-psql user")
+        log.error("Unable to switch to gitlab-psql user")
         return 1
 
     gitlab = psycopg2.connect(
@@ -103,16 +128,19 @@ def main():
                  port="5432")
 
     args = get_args(gitlab)
+    if not args:
+        return 1
+
     if args.command == 'list':
         if (args.projects):
             artifacts = list_artifacts(gitlab, args.projects.keys())
-            show_artifacts(gitlab, args.projects.values(), artifacts, "all artifacts")
+            show_artifacts(gitlab, args.projects.values(), artifacts, "artifacts")
         else:
             show_projects(gitlab)
-    else:
+    elif args.command == 'archive':
         if args.dry_run:
             artifacts = list_archive_artifacts(gitlab, args.projects.keys())
-            show_artifacts(gitlab, args.projects.values(), artifacts, "old artifacts")
+            show_artifacts(gitlab, args.projects.values(), artifacts, "expired artifacts")
         else:
             archive_artifacts(gitlab, args.projects.keys())
             gitlab.commit()
@@ -123,7 +151,7 @@ if __name__=='__main__':
     try:
         main()
     except:
-        print(sys.exc_info()[1])
+        log.error(sys.exc_info()[1])
         sys.exit(1)
     
     sys.exit(0)
