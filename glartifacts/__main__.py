@@ -12,6 +12,7 @@ from .errors import NoProjectError
 from .projects import find_project, list_projects, list_artifacts
 from .archive import list_archive_artifacts, archive_artifacts, ArchiveStrategy
 from .utils import tabulate, humanize_size, humanize_datetime
+from .version import __version__
 
 def switch_user():
     gluser = pwd.getpwnam('gitlab-psql')
@@ -33,7 +34,7 @@ def resolve_project(db):
     return ResolveProject
 
 def get_args(db):
-    parser = argparse.ArgumentParser(description='GitLab Artifact Archiver')
+    parser = argparse.ArgumentParser(prog='glartifacts', description='GitLab Artifact Archiver')
     parser.add_argument(
         '-d', '--debug',
         action="store_true",
@@ -42,6 +43,10 @@ def get_args(db):
         '-v', '--verbose',
         action="store_true",
         help="Show additional information")
+    parser.add_argument(
+        '--version',
+        action='version',
+        version='%(prog)s v'+__version__)
 
     commands = parser.add_subparsers(dest='command', metavar='COMMAND')
     commands.required = True
