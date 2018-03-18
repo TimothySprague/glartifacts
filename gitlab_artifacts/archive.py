@@ -37,10 +37,9 @@ def list_archive_artifacts(db, project_id, strategy):
     sql = strategy_query + action_query
     log.debug("Running %s archive query:\n  %s", strategy.name, indent(sql))
 
-    cur = db.cursor(cursor_factory=psycopg2.extras.DictCursor)
-    cur.execute(sql, dict(project_id=tuple(project_id)))
-
-    return cur.fetchall()
+    with db.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
+        cur.execute(sql, dict(project_id=tuple(project_id)))
+        return cur.fetchall()
 
 def archive_artifacts(db, project_ids, strategy):
     strategy_query = get_archive_strategy_query(strategy)
@@ -49,8 +48,8 @@ def archive_artifacts(db, project_ids, strategy):
     sql = strategy_query + action_query
     log.debug("Running %s archive query:\n  %s", strategy.name, indent(sql))
 
-    cur = db.cursor()
-    cur.execute(sql, dict(project_id=tuple(project_ids)))
+    with db.cursor() as cur:
+        cur.execute(sql, dict(project_id=tuple(project_ids)))
 
 class Query():
     # Find the date of the most recent good pipeline and build

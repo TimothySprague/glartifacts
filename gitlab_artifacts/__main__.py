@@ -8,7 +8,7 @@ import psycopg2
 import psycopg2.extras
 
 from . import log
-from .errors import GitlabArtifactsError, NoProjectError
+from .errors import NoProjectError
 from .projects import find_project, list_projects, list_artifacts
 from .archive import list_archive_artifacts, archive_artifacts, ArchiveStrategy
 from .utils import tabulate, humanize_size, humanize_datetime
@@ -87,13 +87,11 @@ def show_projects(db):
             ])
     tabulate(rows, sortby=dict(key=lambda r: r[0]))
 
-    return 0
-
 def show_artifacts(project_paths, artifacts, scope):
     projects = ", ".join(sorted(project_paths))
     if not len(artifacts):
         print("No "+scope+" were found for "+projects)
-        return 1
+        return
 
     print("Listing", scope, "for", projects, "\n")
     rows = [['Job', 'Scheduled At', 'Built At', 'Status', 'Tag?', 'Expiring?', 'Size']]
@@ -112,54 +110,62 @@ def show_artifacts(project_paths, artifacts, scope):
         dict(key=lambda r: (r[2]), reverse=True)
         ])
 
-    return 0
+def run_command(db, args):
+    if args.command == 'list':
+        if args.projects:
+            artifacts = list_artifacts(db, args.projects.keys())
+            show_artifacts(args.projects.values(), artifacts, "artifacts")
+        else:
+            show_projects(db)
+    elif args.command == 'archive':
+        if args.dry_run:
+            artifacts = list_archive_artifacts(
+                db,
+                args.projects.keys(),
+                args.strategy
+                )
+            show_artifacts(args.projects.values(), artifacts, "expired artifacts")
+        else:
+            with db:
+                archive_artifacts(db, args.projects.keys(), args.strategy)
+    else:
+        raise Exception("Command {} not implemented".format(args.command))
 
 def main():
     logging.basicConfig(
         stream=sys.stderr,
         level=logging.WARN,
         format='%(levelname)s: %(message)s')
+
     try:
         switch_user()
     except PermissionError:
         log.error("Unable to switch to gitlab-psql user")
         return 1
 
-    gitlab = psycopg2.connect(
-        database="gitlabhq_production",
-        user="gitlab-psql",
-        host="/var/opt/gitlab/postgresql",
-        port="5432")
+    db = None
+    try:
+        db = psycopg2.connect(
+            database="gitlabhq_production",
+            user="gitlab-psql",
+            host="/var/opt/gitlab/postgresql",
+            port="5432")
 
-    args = get_args(gitlab)
-    if not args:
-        return 1
+        args = get_args(db)
+        if not args:
+            return 1
 
-    if args.command == 'list':
-        if args.projects:
-            artifacts = list_artifacts(gitlab, args.projects.keys())
-            show_artifacts(args.projects.values(), artifacts, "artifacts")
-        else:
-            show_projects(gitlab)
-    elif args.command == 'archive':
-        if args.dry_run:
-            artifacts = list_archive_artifacts(
-                gitlab,
-                args.projects.keys(),
-                args.strategy
-                )
-            show_artifacts(args.projects.values(), artifacts, "expired artifacts")
-        else:
-            archive_artifacts(gitlab, args.projects.keys(), args.strategy)
-            gitlab.commit()
+        run_command(db, args)
+
+    finally:
+        if db:
+            db.close()
 
     return 0
 
 if __name__ == '__main__':
     try:
-        main()
+        sys.exit(main())
     except Exception:  # pylint: disable=broad-except
         log.error(sys.exc_info()[1])
         sys.exit(1)
-
-    sys.exit(0)
