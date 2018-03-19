@@ -8,7 +8,6 @@ import psycopg2
 import psycopg2.extras
 
 from . import log
-from .errors import NoProjectError
 from .projects import find_project, list_projects, list_artifacts
 from .archive import list_archive_artifacts, archive_artifacts, ArchiveStrategy
 from .utils import tabulate, humanize_size, humanize_datetime
