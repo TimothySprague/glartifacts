@@ -19,21 +19,15 @@ def switch_user():
     os.setuid(gluser.pw_uid)
     os.setuid(gluser.pw_gid)
 
-def resolve_project(db):
-    class ResolveProject(argparse.Action):
-        def __call__(self, parser, args, values, option_string=None):
-            projects = {}
-            for project_path in values:
-                try:
-                    pid = find_project(db, project_path)
-                    projects[pid] = project_path
-                except NoProjectError:
-                    log.error("No project was found with the path %s", project_path)
-                    return 1
-            setattr(args, self.dest, projects)
-    return ResolveProject
+def resolve_projects(db, project_paths):
+    projects = {}
+    for project_path in project_paths:
+        pid = find_project(db, project_path)
+        projects[pid] = project_path
 
-def get_args(db):
+    return projects
+
+def get_args():
     parser = argparse.ArgumentParser(prog='glartifacts', description='GitLab Artifact Archiver')
     parser.add_argument(
         '-d', '--debug',
@@ -48,25 +42,22 @@ def get_args(db):
         action='version',
         version='%(prog)s v'+__version__)
 
-    commands = parser.add_subparsers(dest='command', metavar='COMMAND')
-    commands.required = True
-    listcmd = commands.add_parser("list")
+    commands = parser.add_subparsers(dest='command', title='Commands', metavar='')
+    listcmd = commands.add_parser("list", help='List build artifacts for a project')
     listcmd.add_argument(
         "projects",
         nargs='*',
-        action=resolve_project(db),
         help='Project path whose artifacts will be listed')
 
-    archivecmd = commands.add_parser("archive")
+    archivecmd = commands.add_parser("archive", help='Archive build artifacts for a project')
     archivecmd.add_argument(
         'projects',
         nargs='+',
-        action=resolve_project(db),
         help='Paths to the projects to archive')
     archivecmd.add_argument(
         '--dry-run',
         action="store_true",
-        help='Only print the artifacts that would be archived')
+        help='Identify artifacts to be archived, but do not make any changes')
     archivecmd.add_argument(
         '-s', '--strategy',
         type=ArchiveStrategy.parse,
@@ -75,6 +66,9 @@ def get_args(db):
         help='Select the archive strategy used to identify old artifacts',
         )
     args = parser.parse_args()
+    if not args.command:
+        parser.print_help()
+        return None
 
     if args.debug:
         log.setLevel(logging.DEBUG)
@@ -118,21 +112,23 @@ def show_artifacts(project_paths, artifacts, scope):
 def run_command(db, args):
     if args.command == 'list':
         if args.projects:
-            artifacts = list_artifacts(db, args.projects.keys())
-            show_artifacts(args.projects.values(), artifacts, "artifacts")
+            projects = resolve_projects(db, args.projects)
+            artifacts = list_artifacts(db, projects.keys())
+            show_artifacts(projects.values(), artifacts, "artifacts")
         else:
             show_projects(db)
     elif args.command == 'archive':
+        projects = resolve_projects(db, args.projects)
         if args.dry_run:
             artifacts = list_archive_artifacts(
                 db,
-                args.projects.keys(),
+                projects.keys(),
                 args.strategy
                 )
-            show_artifacts(args.projects.values(), artifacts, "expired artifacts")
+            show_artifacts(projects.values(), artifacts, "expired artifacts")
         else:
             with db:
-                archive_artifacts(db, args.projects.keys(), args.strategy)
+                archive_artifacts(db, projects.keys(), args.strategy)
     else:
         raise Exception("Command {} not implemented".format(args.command))
 
@@ -141,6 +137,10 @@ def main():
         stream=sys.stderr,
         level=logging.WARN,
         format='%(levelname)s: %(message)s')
+
+    args = get_args()
+    if not args:
+        return 1
 
     try:
         switch_user()
@@ -155,10 +155,6 @@ def main():
             user="gitlab-psql",
             host="/var/opt/gitlab/postgresql",
             port="5432")
-
-        args = get_args(db)
-        if not args:
-            return 1
 
         run_command(db, args)
 
