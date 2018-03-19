@@ -8,6 +8,7 @@ import psycopg2
 import psycopg2.extras
 
 from . import log
+from .errors import GitlabArtifactsError
 from .projects import find_project, list_projects, list_artifacts
 from .archive import list_archive_artifacts, archive_artifacts, ArchiveStrategy
 from .utils import tabulate, humanize_size, humanize_datetime
@@ -42,15 +43,21 @@ def get_args():
         version='%(prog)s v'+__version__)
 
     commands = parser.add_subparsers(dest='command', title='Commands', metavar='')
-    listcmd = commands.add_parser("list", help='List build artifacts for a project')
+    listcmd = commands.add_parser("list", help='List build artifacts')
     listcmd.add_argument(
         "projects",
+        metavar='PROJECT',
         nargs='*',
         help='Project path whose artifacts will be listed')
+    listcmd.add_argument(
+        '-s', '--short',
+        action='store_true',
+        help='Use a short list format that only prints project names')
 
     archivecmd = commands.add_parser("archive", help='Archive build artifacts for a project')
     archivecmd.add_argument(
         'projects',
+        metavar='PROJECT',
         nargs='+',
         help='Paths to the projects to archive')
     archivecmd.add_argument(
@@ -76,19 +83,30 @@ def get_args():
 
     return args
 
-def show_projects(db):
+def show_projects(db, short_format=False):
+    projects = list_projects(db)
+    if not len(projects):
+        raise GitlabArtifactsError("No projects were found with artifacts")
+
+    if short_format:
+        print("\n".join(['/'.join([p['namespace'], p['project']]) for p in projects]))
+        return
+
     rows = [['Project', 'Jobs with Artifacts']]
-    for p in list_projects(db):
+    for p in projects:
         rows.append([
-            '/'.join([p['namespace'], p['project']]),
+            '/'.join(set(p['namespace'], p['project'])),
             p['artifact_count']
             ])
     tabulate(rows, sortby=dict(key=lambda r: r[0]))
 
-def show_artifacts(project_paths, artifacts, scope):
+def show_artifacts(project_paths, artifacts, scope, short_format=False):
     projects = ", ".join(sorted(project_paths))
     if not len(artifacts):
-        print("No "+scope+" were found for "+projects)
+        raise GitlabArtifactsError("No "+scope+" were found for "+projects)
+
+    if short_format:
+        print("\n".join(set(r['name'] for r in artifacts)))
         return
 
     print("Listing", scope, "for", projects, "\n")
@@ -113,9 +131,9 @@ def run_command(db, args):
         if args.projects:
             projects = resolve_projects(db, args.projects)
             artifacts = list_artifacts(db, projects.keys())
-            show_artifacts(projects.values(), artifacts, "artifacts")
+            show_artifacts(projects.values(), artifacts, "artifacts", args.short)
         else:
-            show_projects(db)
+            show_projects(db, args.short)
     elif args.command == 'archive':
         projects = resolve_projects(db, args.projects)
         if args.dry_run:
