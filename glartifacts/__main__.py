@@ -3,6 +3,7 @@ import logging
 import os
 import pwd
 import sys
+import traceback
 
 import psycopg2
 import psycopg2.extras
@@ -32,11 +33,11 @@ def get_args():
     parser.add_argument(
         '-d', '--debug',
         action="store_true",
-        help="Show detailed debug information")
+        help="show detailed debug information")
     parser.add_argument(
         '--verbose',
         action="store_true",
-        help="Show additional information")
+        help="show additional information")
     parser.add_argument(
         '-v', '--version',
         action='version',
@@ -48,28 +49,28 @@ def get_args():
         "projects",
         metavar='PROJECT',
         nargs='*',
-        help='Project path whose artifacts will be listed')
+        help='project path whose artifacts will be listed')
     listcmd.add_argument(
         '-s', '--short',
         action='store_true',
-        help='Use a short list format that only prints project names')
+        help='use a short list format that only prints project names')
 
     archivecmd = commands.add_parser("archive", help='Archive build artifacts for a project')
     archivecmd.add_argument(
         'projects',
         metavar='PROJECT',
         nargs='+',
-        help='Paths to the projects to archive')
+        help='paths to the projects to archive')
     archivecmd.add_argument(
         '--dry-run',
         action="store_true",
-        help='Identify artifacts to be archived, but do not make any changes')
+        help='identify artifacts to be archived, but do not make any changes')
     archivecmd.add_argument(
         '-s', '--strategy',
         type=ArchiveStrategy.parse,
         choices=list(ArchiveStrategy),
         default=ArchiveStrategy.LASTGOOD_BUILD,
-        help='Select the archive strategy used to identify old artifacts',
+        help='select the archive strategy used to identify old artifacts',
         )
     args = parser.parse_args()
     if not args.command:
@@ -89,13 +90,14 @@ def show_projects(db, short_format=False):
         raise GitlabArtifactsError("No projects were found with artifacts")
 
     if short_format:
-        print("\n".join(['/'.join([p['namespace'], p['project']]) for p in projects]))
+        names = set(['/'.join((p['namespace'], p['project'])) for p in projects])
+        print("\n".join(names))
         return
 
     rows = [['Project', 'Jobs with Artifacts']]
     for p in projects:
         rows.append([
-            '/'.join(set(p['namespace'], p['project'])),
+            '/'.join((p['namespace'], p['project'])),
             p['artifact_count']
             ])
     tabulate(rows, sortby=dict(key=lambda r: r[0]))
@@ -106,7 +108,7 @@ def show_artifacts(project_paths, artifacts, scope, short_format=False):
         raise GitlabArtifactsError("No "+scope+" were found for "+projects)
 
     if short_format:
-        print("\n".join(set(r['name'] for r in artifacts)))
+        print("\n".join(set([r['name'] for r in artifacts])))
         return
 
     print("Listing", scope, "for", projects, "\n")
@@ -157,7 +159,7 @@ def main():
 
     args = get_args()
     if not args:
-        return 1
+        sys.exit(1)
 
     try:
         switch_user()
@@ -186,4 +188,7 @@ if __name__ == '__main__':
         sys.exit(main())
     except Exception:  # pylint: disable=broad-except
         log.error(sys.exc_info()[1])
+        if log.level == logging.DEBUG:
+            traceback.print_exc()
+
         sys.exit(1)
