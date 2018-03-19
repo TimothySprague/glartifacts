@@ -33,11 +33,11 @@ def get_args():
         action="store_true",
         help="Show detailed debug information")
     parser.add_argument(
-        '-v', '--verbose',
+        '--verbose',
         action="store_true",
         help="Show additional information")
     parser.add_argument(
-        '--version',
+        '-v', '--version',
         action='version',
         version='%(prog)s v'+__version__)
 
