@@ -75,14 +75,10 @@ artifacts are never removed.
 
 The strategies available are listed below.
 
-|Name			|Description	|
-|-----------------------|---------------|
-|LASTGOOD_PIPELINE   	|Keep artifacts from all jobs in the last successful|
-|			|pipeline. The entire pipeline must succeed to advance|
-|			|the expiration point-in-time.|
-|LASTGOOD_BUILD		|Keep artifacts from the last successful job. The|
-|			|point-in-time is advanced any time the job succeeds, |
-|			|even if its pipeline fails. |
+|Name|Description	|
+|-----------|---------------|
+|LASTGOOD_PIPELINE|Keep artifacts from all jobs in the last successful pipeline. The entire pipeline must succeed to advance the expiration point-in-time.|
+|LASTGOOD_BUILD|Keep artifacts from the last successful job. The point-in-time is advanced any time the job succeeds, even if its pipeline fails. |
 
 The `--dry-run` option lists the artifacts that would be removed by the
 selected strategy.
