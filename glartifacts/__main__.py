@@ -112,9 +112,10 @@ def show_artifacts(project_paths, artifacts, scope, short_format=False):
         return
 
     print("Listing", scope, "for", projects, "\n")
-    rows = [['Job', 'Scheduled At', 'Built At', 'Status', 'Tag?', 'Expiring?', 'Size']]
+    rows = [['Pipeline', 'Job', 'Scheduled At', 'Built At', 'Status', 'Tag?', 'Expiring?', 'Size']]
     for r in artifacts:
         rows.append([
+            '#'+str(r['pipeline_id']),
             r['name'],
             humanize_datetime(r['scheduled_at']),
             humanize_datetime(r['built_at']),
@@ -124,9 +125,9 @@ def show_artifacts(project_paths, artifacts, scope, short_format=False):
             humanize_size(r['size'])
             ])
     tabulate(rows, sortby=[
+        dict(key=lambda r: (r[3]), reverse=True),
         dict(key=lambda r: (r[2]), reverse=True),
-        dict(key=lambda r: (r[1]), reverse=True),
-        dict(key=lambda r: (r[0])),
+        dict(key=lambda r: (r[1])),
         ])
 
 def run_command(db, args):
