@@ -12,7 +12,7 @@ from . import log
 from .errors import GitlabArtifactsError
 from .projects import find_project, list_projects, list_artifacts
 from .archive import list_archive_artifacts, archive_artifacts, ArchiveStrategy
-from .utils import tabulate, humanize_size, humanize_datetime
+from .utils import tabulate, humanize_datetime, humanize_size
 from .version import __version__
 
 def switch_user():
@@ -124,8 +124,9 @@ def show_artifacts(project_paths, artifacts, scope, short_format=False):
             humanize_size(r['size'])
             ])
     tabulate(rows, sortby=[
-        dict(key=lambda r: (r[0], r[1])),
-        dict(key=lambda r: (r[2]), reverse=True)
+        dict(key=lambda r: (r[2]), reverse=True),
+        dict(key=lambda r: (r[1]), reverse=True),
+        dict(key=lambda r: (r[0])),
         ])
 
 def run_command(db, args):
