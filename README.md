@@ -34,7 +34,7 @@ When one or more optional
 project paths are provided, this command prints detailed information about
 each artifact, including: schedule date, build date, tagged build, and size.
 
-**Example**
+#### Example
 ```
 # glartifacts list $(glartifacts list -s)
 Listing artifacts for awesomesoft/awesome-core 
@@ -84,3 +84,39 @@ The strategies available are listed below.
 
 The `--dry-run` option lists the artifacts that would be removed by the
 selected strategy.
+
+#### Example
+
+List old artifacts for all projects
+```
+# glartifacts archive --dry-run $(glartifacts list -s)
+Listing expired artifacts for awesomesoft/awesome-core 
+
+Pipeline Job       Scheduled At        Built At            Status  Tag? Expiring? Size     
+-------- --------- ------------------- ------------------- ------- ---- --------- -------- 
+#13      awesomify 2018-03-18 11:58:26 2018-03-18 11:58:26 success no   no        2.73 KiB 
+#11      awesomify 2018-03-17 09:55:40 2018-03-19 10:28:02 success no   no        2.73 KiB 
+#9       awesomify 2018-03-15 10:40:58 2018-03-19 10:28:25 success no   no        2.73 KiB 
+#8       awesomify 2018-03-14 10:14:48 2018-03-19 10:29:45 success no   no        2.73 KiB 
+#6       awesomify 2018-02-23 04:02:01 2018-03-19 10:28:15 success no   no        2.75 KiB
+```
+Mark the old artifacts as expired
+```
+# glartifacts archive awesomesoft/awesome-core
+```
+
+List the current state of the project's artifacts. Artifacts are removed
+from this list by Sidekiq.
+```
+# glartifacts list awesomesoft/awesome-core
+Listing artifacts for awesomesoft/awesome-core 
+
+Pipeline Job       Scheduled At        Built At            Status  Tag? Expiring? Size     
+-------- --------- ------------------- ------------------- ------- ---- --------- -------- 
+#13      awesomify 2018-03-18 11:58:26 2018-03-19 10:27:47 success no   no        2.73 KiB 
+#13      awesomify 2018-03-18 11:58:26 2018-03-18 11:58:26 success no   yes       2.73 KiB 
+#11      awesomify 2018-03-17 09:55:40 2018-03-19 10:28:02 success no   yes       2.73 KiB 
+#9       awesomify 2018-03-15 10:40:58 2018-03-19 10:28:25 success no   yes       2.73 KiB 
+#8       awesomify 2018-03-14 10:14:48 2018-03-19 10:29:45 success no   yes       2.73 KiB 
+#6       awesomify 2018-02-23 04:02:01 2018-03-19 10:28:15 success no   yes       2.75 KiB 
+```
