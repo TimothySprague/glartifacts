@@ -55,15 +55,23 @@ class Query():
     # Find the date of the most recent good pipeline and build
     lastgood = """
 with lastgood as (
+select lg.project_id, lg.name, lg.pipeline_date,
+    max(b.created_at) as build_date
+from (
     select b.project_id, b.name,
-            max(p.created_at) as pipeline_date,
-            max(b.created_at) as build_date
+            max(p.created_at) as pipeline_date
     from ci_builds as b
     join ci_stages as s on s.id=b.stage_id
     join ci_pipelines as p on p.id=s.pipeline_id
     where b.project_id in %(project_id)s and
         {}
-    group by b.name, b.project_id
+    group by b.project_id, b.name
+) as lg
+join ci_builds as b on b.project_id=lg.project_id and b.name=lg.name
+join ci_stages as s on s.id=b.stage_id
+join ci_pipelines as p on p.id=s.pipeline_id
+where p.created_at = lg.pipeline_date
+group by lg.project_id, lg.name, lg.pipeline_date
 )
 """
 
@@ -73,7 +81,8 @@ with lastgood as (
 
     # Identifies old artifacts based on a lastgood strategy
     # "old" is defined as:
-    #    Older than the lastgood build or pipeline
+    #    Older than the lastgood pipeline OR
+    #       older than the lastgood build within the lastgood pipeline
     #    Not tagged
     #    Not already expired
     #    Has artifacts file_type=1 (zip)
@@ -83,8 +92,10 @@ join ci_builds as b on b.project_id=lastgood.project_id and b.name=lastgood.name
 join ci_stages as s on s.id=b.stage_id
 join ci_pipelines as p on p.id=s.pipeline_id
 join ci_job_artifacts as a on a.job_id=b.id
-where b.created_at<lastgood.build_date
-    and p.created_at<lastgood.pipeline_date
+where (
+        p.created_at<lastgood.pipeline_date or
+        (p.created_at=lastgood.pipeline_date and b.created_at<lastgood.build_date)
+    )
     and b.tag = false
     and b.artifacts_expire_at is null
     and a.file_type = 1
