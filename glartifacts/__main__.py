@@ -17,8 +17,8 @@ from .version import __version__
 
 def switch_user():
     gluser = pwd.getpwnam('gitlab-psql')
+    os.setgid(gluser.pw_gid)
     os.setuid(gluser.pw_uid)
-    os.setuid(gluser.pw_gid)
 
 def resolve_projects(db, project_paths):
     projects = {}
