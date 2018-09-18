@@ -67,7 +67,7 @@ group by a.project_id, p.path, n.path
 """
 
     get_artifacts = """
-select p.id as pipeline_id, a.size, b.name, b.status, b.tag,
+select p.id as pipeline_id, a.size, b.name, b.id as job_id, b.status, b.tag,
     p.created_at as scheduled_at, b.created_at as built_at,
     b.artifacts_expire_at as expire_at
 from ci_job_artifacts as a

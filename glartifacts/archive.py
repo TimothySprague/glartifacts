@@ -103,7 +103,7 @@ where (
 
     # Wrapper that lists identified artifacts
     artifact_list = """
-select p.id as pipeline_id, a.size, b.name, b.status, b.tag,
+select p.id as pipeline_id, a.size, b.id as job_id, b.name, b.status, b.tag,
     p.created_at as scheduled_at, b.created_at as built_at,
     b.artifacts_expire_at as expire_at
 {}
