@@ -3,10 +3,10 @@ import psycopg2.extras
 
 from .errors import NoProjectError
 
-def get_project_id(db, name, parent_id):
+def get_project_id(db, path, parent_id):
     project = None
     with db.cursor() as cur:
-        cur.execute(Query.get_project, dict(name=name, parent_id=parent_id))
+        cur.execute(Query.get_project, dict(path=path, parent_id=parent_id))
         project = cur.fetchone()
 
     if not project:
@@ -14,10 +14,10 @@ def get_project_id(db, name, parent_id):
 
     return project[0]
 
-def get_namespace_id(db, name, parent_id):
+def get_namespace_id(db, path, parent_id):
     ns = None
     with db.cursor() as cur:
-        cur.execute(Query.get_namespace, dict(name=name, parent_id=parent_id))
+        cur.execute(Query.get_namespace, dict(path=path, parent_id=parent_id))
         ns = cur.fetchone()
 
     if not ns:
@@ -57,13 +57,13 @@ def list_artifacts(db, project_ids):
 
 class Query():
     projects_with_artifacts = """
-select a.project_id, p.name as project, n.name as namespace,
+select a.project_id, p.path as project, n.path as namespace,
     count(distinct a.job_id) as artifact_count
 from ci_job_artifacts as a
 inner join projects as p on p.id=a.project_id
 left join namespaces as n on p.namespace_id=n.id
 where a.file_type <> 3
-group by a.project_id, p.name, n.name
+group by a.project_id, p.path, n.path
 """
 
     get_artifacts = """
@@ -78,11 +78,11 @@ where a.project_id IN %(project_id)s and a.file_type=1
 """
 
     get_namespace = """
-select id from namespaces where name=%(name)s and
+select id from namespaces where path=%(path)s and
     (%(parent_id)s is null or parent_id=%(parent_id)s)
 """
 
     get_project = """
-select id from projects where name=%(name)s and
+select id from projects where path=%(path)s and
     (%(parent_id)s is null or namespace_id=%(parent_id)s)
 """
