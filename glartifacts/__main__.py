@@ -153,7 +153,7 @@ def run_command(db, args):
     else:
         raise Exception("Command {} not implemented".format(args.command))
 
-def main():
+def glartifacts():
     logging.basicConfig(
         stream=sys.stderr,
         level=logging.WARN,
@@ -185,12 +185,15 @@ def main():
 
     return 0
 
-if __name__ == '__main__':
+def main():
     try:
-        sys.exit(main())
+        sys.exit(glartifacts())
     except Exception:  # pylint: disable=broad-except
         log.error(sys.exc_info()[1])
         if log.level == logging.DEBUG:
             traceback.print_exc()
 
         sys.exit(1)
+
+if __name__ == '__main__':
+    main()
