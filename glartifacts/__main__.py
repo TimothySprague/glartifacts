@@ -94,16 +94,18 @@ def show_projects(db, short_format=False):
         print("\n".join(names))
         return
 
-    rows = [['Project', 'Jobs with Artifacts']]
+    rows = [['Project', 'Id','Jobs with Artifacts']]
     for p in projects:
         rows.append([
             '/'.join((p['namespace'], p['project'])),
+            p['project_id'],
             p['artifact_count']
             ])
     tabulate(rows, sortby=dict(key=lambda r: r[0]))
 
-def show_artifacts(project_paths, artifacts, scope, short_format=False):
-    projects = ", ".join(sorted(project_paths))
+def show_artifacts(projects, artifacts, scope, short_format=False):
+    project_names = ['{} #{}'.format(projects[key], key) for key in projects]
+    projects = ", ".join(sorted(project_names))
     if not len(artifacts):
         raise GitlabArtifactsError("No "+scope+" were found for "+projects)
 
@@ -137,7 +139,7 @@ def run_command(db, args):
         if args.projects:
             projects = resolve_projects(db, args.projects)
             artifacts = list_artifacts(db, projects.keys())
-            show_artifacts(projects.values(), artifacts, "artifacts", args.short)
+            show_artifacts(projects, artifacts, "artifacts", args.short)
         else:
             show_projects(db, args.short)
     elif args.command == 'archive':
@@ -148,7 +150,7 @@ def run_command(db, args):
                 projects.keys(),
                 args.strategy
                 )
-            show_artifacts(projects.values(), artifacts, "expired artifacts")
+            show_artifacts(projects, artifacts, "expired artifacts")
         else:
             with db:
                 archive_artifacts(db, projects.keys(), args.strategy)
