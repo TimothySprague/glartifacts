@@ -29,7 +29,9 @@ def resolve_projects(db, project_paths):
     return projects
 
 def get_args():
-    parser = argparse.ArgumentParser(prog='glartifacts', description='GitLab Artifact Archiver')
+    parser = argparse.ArgumentParser(
+        prog='glartifacts',
+        description='GitLab Artifact Archiver')
     parser.add_argument(
         '-d', '--debug',
         action="store_true",
@@ -70,7 +72,7 @@ def get_args():
         type=ArchiveStrategy.parse,
         choices=list(ArchiveStrategy),
         default=ArchiveStrategy.LASTGOOD_BUILD,
-        help='select the archive strategy used to identify old artifacts',
+        help='select the archive strategy used to identify old artifacts (default: LASTGOOD_BUILD)',
         )
     args = parser.parse_args()
     if not args.command:
@@ -94,16 +96,18 @@ def show_projects(db, short_format=False):
         print("\n".join(names))
         return
 
-    rows = [['Project', 'Jobs with Artifacts']]
+    rows = [['Project', 'Id','Jobs with Artifacts']]
     for p in projects:
         rows.append([
             '/'.join((p['namespace'], p['project'])),
+            p['project_id'],
             p['artifact_count']
             ])
     tabulate(rows, sortby=dict(key=lambda r: r[0]))
 
-def show_artifacts(project_paths, artifacts, scope, short_format=False):
-    projects = ", ".join(sorted(project_paths))
+def show_artifacts(projects, artifacts, scope, short_format=False, strategy=None):
+    project_names = ['{} #{}'.format(projects[key], key) for key in projects]
+    projects = ", ".join(sorted(project_names))
     if not len(artifacts):
         raise GitlabArtifactsError("No "+scope+" were found for "+projects)
 
@@ -111,12 +115,18 @@ def show_artifacts(project_paths, artifacts, scope, short_format=False):
         print("\n".join(set([r['name'] for r in artifacts])))
         return
 
-    print("Listing", scope, "for", projects, "\n")
-    rows = [['Pipeline', 'Job', 'Scheduled At', 'Built At', 'Status', 'Tag?', 'Expiring?', 'Size']]
+    print("Listing", scope, "for", projects, end="")
+    if strategy:
+        print(" using", strategy, "strategy", end="")
+    print("\n")
+
+    rows = [['Pipeline', 'Job', '', 'Scheduled At', 'Built At', 'Status', 'Tag?', 'Expiring?', 'Size']]
     for r in artifacts:
         rows.append([
             '#'+str(r['pipeline_id']),
             r['name'],
+            '#'+str(r['job_id']),
+            #'{} #{}'.format(r['name'], r['job_id']),
             humanize_datetime(r['scheduled_at']),
             humanize_datetime(r['built_at']),
             r['status'],
@@ -125,9 +135,9 @@ def show_artifacts(project_paths, artifacts, scope, short_format=False):
             humanize_size(r['size'])
             ])
     tabulate(rows, sortby=[
+        dict(key=lambda r: (r[4]), reverse=True),
         dict(key=lambda r: (r[3]), reverse=True),
-        dict(key=lambda r: (r[2]), reverse=True),
-        dict(key=lambda r: (r[1])),
+        dict(key=lambda r: (r[0]), reverse=True),
         ])
 
 def run_command(db, args):
@@ -135,7 +145,7 @@ def run_command(db, args):
         if args.projects:
             projects = resolve_projects(db, args.projects)
             artifacts = list_artifacts(db, projects.keys())
-            show_artifacts(projects.values(), artifacts, "artifacts", args.short)
+            show_artifacts(projects, artifacts, "artifacts", args.short)
         else:
             show_projects(db, args.short)
     elif args.command == 'archive':
@@ -146,14 +156,14 @@ def run_command(db, args):
                 projects.keys(),
                 args.strategy
                 )
-            show_artifacts(projects.values(), artifacts, "expired artifacts")
+            show_artifacts(projects, artifacts, "expired artifacts", strategy=args.strategy)
         else:
             with db:
                 archive_artifacts(db, projects.keys(), args.strategy)
     else:
         raise Exception("Command {} not implemented".format(args.command))
 
-def main():
+def glartifacts():
     logging.basicConfig(
         stream=sys.stderr,
         level=logging.WARN,
@@ -185,12 +195,15 @@ def main():
 
     return 0
 
-if __name__ == '__main__':
+def main():
     try:
-        sys.exit(main())
+        sys.exit(glartifacts())
     except Exception:  # pylint: disable=broad-except
         log.error(sys.exc_info()[1])
         if log.level == logging.DEBUG:
             traceback.print_exc()
 
         sys.exit(1)
+
+if __name__ == '__main__':
+    main()
