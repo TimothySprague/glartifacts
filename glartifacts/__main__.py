@@ -29,7 +29,9 @@ def resolve_projects(db, project_paths):
     return projects
 
 def get_args():
-    parser = argparse.ArgumentParser(prog='glartifacts', description='GitLab Artifact Archiver')
+    parser = argparse.ArgumentParser(
+        prog='glartifacts',
+        description='GitLab Artifact Archiver')
     parser.add_argument(
         '-d', '--debug',
         action="store_true",
@@ -70,7 +72,7 @@ def get_args():
         type=ArchiveStrategy.parse,
         choices=list(ArchiveStrategy),
         default=ArchiveStrategy.LASTGOOD_BUILD,
-        help='select the archive strategy used to identify old artifacts',
+        help='select the archive strategy used to identify old artifacts (default: LASTGOOD_BUILD)',
         )
     args = parser.parse_args()
     if not args.command:
@@ -103,7 +105,7 @@ def show_projects(db, short_format=False):
             ])
     tabulate(rows, sortby=dict(key=lambda r: r[0]))
 
-def show_artifacts(projects, artifacts, scope, short_format=False):
+def show_artifacts(projects, artifacts, scope, short_format=False, strategy=None):
     project_names = ['{} #{}'.format(projects[key], key) for key in projects]
     projects = ", ".join(sorted(project_names))
     if not len(artifacts):
@@ -113,7 +115,11 @@ def show_artifacts(projects, artifacts, scope, short_format=False):
         print("\n".join(set([r['name'] for r in artifacts])))
         return
 
-    print("Listing", scope, "for", projects, "\n")
+    print("Listing", scope, "for", projects, end="")
+    if strategy:
+        print(" using", strategy, "strategy", end="")
+    print("\n")
+
     rows = [['Pipeline', 'Job', '', 'Scheduled At', 'Built At', 'Status', 'Tag?', 'Expiring?', 'Size']]
     for r in artifacts:
         rows.append([
@@ -150,7 +156,7 @@ def run_command(db, args):
                 projects.keys(),
                 args.strategy
                 )
-            show_artifacts(projects, artifacts, "expired artifacts")
+            show_artifacts(projects, artifacts, "expired artifacts", strategy=args.strategy)
         else:
             with db:
                 archive_artifacts(db, projects.keys(), args.strategy)
