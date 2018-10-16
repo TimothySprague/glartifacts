@@ -3,7 +3,16 @@ import psycopg2.extras
 
 from .errors import NoProjectError
 
-def get_project_id(db, path, parent_id):
+class Project(object):
+    def __init__(self, id, path, storage):
+        self.id = id
+        self.storage = storage
+        self.full_path = path
+        self.disk_path = self.full_path + '.git'
+        self.gl_repository = 'project-{}'.format(id)
+        self.projects = None
+
+def get_project(db, path, parent_id):
     project = None
     with db.cursor() as cur:
         cur.execute(Query.get_project, dict(path=path, parent_id=parent_id))
@@ -12,7 +21,7 @@ def get_project_id(db, path, parent_id):
     if not project:
         raise NoProjectError
 
-    return project[0]
+    return project
 
 def get_namespace_id(db, path, parent_id):
     ns = None
@@ -25,23 +34,31 @@ def get_namespace_id(db, path, parent_id):
 
     return ns[0]
 
-def walk_namespaces(db, namespaces, project, parent_id=None):
+def walk_namespaces(db, namespaces, project_path, parent_id=None):
     if not namespaces:
-        return get_project_id(db, project, parent_id)
+        return get_project(db, project_path, parent_id)
 
     ns = namespaces.pop(0)
     ns_id = get_namespace_id(db, ns, parent_id)
 
-    return walk_namespaces(db, namespaces, project, ns_id)
+    return walk_namespaces(db, namespaces, project_path, ns_id)
 
 def find_project(db, project_path):
     namespaces = project_path.split('/')
     if not namespaces:
         raise NoProjectError
 
-    project = namespaces.pop()
+    path = namespaces.pop()
+    id, storage = walk_namespaces(
+            db,
+            namespaces,
+            path)
 
-    return walk_namespaces(db, namespaces, project)
+    return Project(
+            id,
+            project_path,
+            storage
+            )
 
 def list_projects(db):
     with db.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
@@ -84,6 +101,8 @@ select id from namespaces where path=%(path)s and
 """
 
     get_project = """
-select id from projects where path=%(path)s and
+select id, repository_storage
+from projects
+where path=%(path)s and
     (%(parent_id)s is null or namespace_id=%(parent_id)s)
 """
