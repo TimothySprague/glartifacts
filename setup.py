@@ -10,7 +10,11 @@ setuptools.setup(
     author='Mike Haboustak',
     author_email='haboustak@gmail.com',
     url='https://gitlab.com/haboustak/gitlab-artifact-tools',
-    packages=['glartifacts'],
+    packages=[
+        'glartifacts',
+        'glartifacts.gitaly',
+        'glartifacts.gitaly.proto',
+        ],
     entry_points={
         'console_scripts': [
             'glartifacts = glartifacts.__main__:main',
@@ -18,5 +22,7 @@ setuptools.setup(
     },
     install_requires=[
         'psycopg2==2.6',
+        'protobuf>=3.6.1',
+        'grpcio>=1.15.0',
     ],
 )
