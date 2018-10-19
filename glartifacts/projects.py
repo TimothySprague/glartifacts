@@ -14,9 +14,11 @@ class Project(object):
 
 def get_project(db, path, parent_id):
     project = None
-    with db.cursor() as cur:
-        cur.execute(Query.get_project, dict(path=path, parent_id=parent_id))
-        project = cur.fetchone()
+
+    with db:
+        with db.cursor() as cur:
+            cur.execute(Query.get_project, dict(path=path, parent_id=parent_id))
+            project = cur.fetchone()
 
     if not project:
         raise NoProjectError
@@ -25,9 +27,10 @@ def get_project(db, path, parent_id):
 
 def get_namespace_id(db, path, parent_id):
     ns = None
-    with db.cursor() as cur:
-        cur.execute(Query.get_namespace, dict(path=path, parent_id=parent_id))
-        ns = cur.fetchone()
+    with db:
+        with db.cursor() as cur:
+            cur.execute(Query.get_namespace, dict(path=path, parent_id=parent_id))
+            ns = cur.fetchone()
 
     if not ns:
         raise NoProjectError
@@ -61,16 +64,16 @@ def find_project(db, project_path):
             )
 
 def list_projects(db):
-    with db.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
-        cur.execute(Query.projects_with_artifacts)
-
-        return cur.fetchall()
+    with db:
+        with db.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
+            cur.execute(Query.projects_with_artifacts)
+            return cur.fetchall()
 
 def list_artifacts(db, project_ids):
-    with db.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
-        cur.execute(Query.get_artifacts, dict(project_id=tuple(project_ids)))
-
-        return cur.fetchall()
+    with db:
+        with db.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
+            cur.execute(Query.get_artifacts, dict(project_id=tuple(project_ids)))
+            return cur.fetchall()
 
 class Query():
     projects_with_artifacts = """

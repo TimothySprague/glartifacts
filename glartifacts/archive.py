@@ -27,7 +27,7 @@ class ArchiveStrategy(enum.Enum):
 
 def _load_project_branches(cursor, projects):
     cursor.execute(
-        "create temp table __project_branches (id int, ref varchar)"
+        "create temp table __project_branches (id int, ref varchar) on commit drop"
         )
 
     # Get a flattened list of (id, ref) tuples
@@ -59,10 +59,11 @@ def list_archive_artifacts(db, projects, strategy):
     sql = strategy_query + action_query
     log.debug("Running %s archive query:\n  %s", strategy.name, indent(sql))
 
-    with db.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
-        _load_project_branches(cur, projects)
-        cur.execute(sql, dict(project_id=tuple(projects.keys())))
-        return cur.fetchall()
+    with db:
+        with db.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
+            _load_project_branches(cur, projects)
+            cur.execute(sql, dict(project_id=tuple(projects.keys())))
+            return cur.fetchall()
 
 def archive_artifacts(db, projects, strategy):
     strategy_query = get_archive_strategy_query(strategy)
@@ -71,9 +72,10 @@ def archive_artifacts(db, projects, strategy):
     sql = strategy_query + action_query
     log.debug("Running %s archive query:\n  %s", strategy.name, indent(sql))
 
-    with db.cursor() as cur:
-        _load_project_branches(cur, projects)
-        cur.execute(sql, dict(project_id=tuple(projects.keys())))
+    with db:
+        with db.cursor() as cur:
+            _load_project_branches(cur, projects)
+            cur.execute(sql, dict(project_id=tuple(projects.keys())))
 
 class Query():
     # Find the date of the most recent good pipeline and build
