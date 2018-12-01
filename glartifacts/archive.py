@@ -1,4 +1,6 @@
 import enum
+import io
+import itertools
 
 import psycopg2
 import psycopg2.extras
@@ -23,6 +25,26 @@ class ArchiveStrategy(enum.Enum):
         except KeyError:
             return None
 
+def _load_project_branches(cursor, projects):
+    cursor.execute(
+        "create temp table __project_branches (id int, ref varchar) on commit drop"
+        )
+
+    # Get a flattened list of (id, ref) tuples
+    items = map(
+        lambda p: ['{}\t{}\n'.format(p.id, branch) for branch in p.branches],
+        projects.values()
+        )
+    items = itertools.chain.from_iterable(items)
+
+    # psql copy_from requires a tab-delimited value
+    data = io.StringIO()
+    for row in items:
+        data.write(row)
+    data.seek(0)
+
+    cursor.copy_from(data, '__project_branches', columns=('id', 'ref'))
+
 def get_archive_strategy_query(strategy):
     if strategy == ArchiveStrategy.LASTGOOD_BUILD:
         return Query.lastgood.format(Query.good_build)
@@ -31,25 +53,29 @@ def get_archive_strategy_query(strategy):
 
     raise Exception("Strategy {} not implemented".format(strategy.name))
 
-def list_archive_artifacts(db, project_id, strategy):
+def list_archive_artifacts(db, projects, strategy):
     strategy_query = get_archive_strategy_query(strategy)
     action_query = Query.artifact_list.format(Query.identify_artifacts)
     sql = strategy_query + action_query
     log.debug("Running %s archive query:\n  %s", strategy.name, indent(sql))
 
-    with db.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
-        cur.execute(sql, dict(project_id=tuple(project_id)))
-        return cur.fetchall()
+    with db:
+        with db.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
+            _load_project_branches(cur, projects)
+            cur.execute(sql, dict(project_id=tuple(projects.keys())))
+            return cur.fetchall()
 
-def archive_artifacts(db, project_ids, strategy):
+def archive_artifacts(db, projects, strategy):
     strategy_query = get_archive_strategy_query(strategy)
     action_query = Query.artifact_expire.format(Query.identify_artifacts)
 
     sql = strategy_query + action_query
     log.debug("Running %s archive query:\n  %s", strategy.name, indent(sql))
 
-    with db.cursor() as cur:
-        cur.execute(sql, dict(project_id=tuple(project_ids)))
+    with db:
+        with db.cursor() as cur:
+            _load_project_branches(cur, projects)
+            cur.execute(sql, dict(project_id=tuple(projects.keys())))
 
 class Query():
     # Find the date of the most recent good pipeline and build
@@ -92,9 +118,11 @@ join ci_builds as b on b.project_id=lastgood.project_id and b.name=lastgood.name
 join ci_stages as s on s.id=b.stage_id
 join ci_pipelines as p on p.id=s.pipeline_id
 join ci_job_artifacts as a on a.job_id=b.id
+left join __project_branches as pb on pb.id=b.project_id and pb.ref=b.ref
 where (
         p.created_at<lastgood.pipeline_date or
         (p.created_at=lastgood.pipeline_date and b.created_at<lastgood.build_date)
+        or pb.id is NULL
     )
     and b.tag = false
     and b.artifacts_expire_at is null

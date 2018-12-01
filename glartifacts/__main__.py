@@ -6,25 +6,28 @@ import sys
 import traceback
 
 import psycopg2
-import psycopg2.extras
 
 from . import log
 from .errors import GitlabArtifactsError
+from .gitaly import GitalyClient
 from .projects import find_project, list_projects, list_artifacts
 from .archive import list_archive_artifacts, archive_artifacts, ArchiveStrategy
 from .utils import tabulate, humanize_datetime, humanize_size
 from .version import __version__
 
 def switch_user():
-    gluser = pwd.getpwnam('gitlab-psql')
+    gluser = pwd.getpwnam('git')
     os.setgid(gluser.pw_gid)
     os.setuid(gluser.pw_uid)
 
 def resolve_projects(db, project_paths):
     projects = {}
-    for project_path in project_paths:
-        pid = find_project(db, project_path)
-        projects[pid] = project_path
+    with GitalyClient() as gitaly:
+        for project_path in project_paths:
+            project = find_project(db, project_path)
+            project.branches = gitaly.get_branches(project)
+
+            projects[project.id] = project
 
     return projects
 
@@ -106,7 +109,7 @@ def show_projects(db, short_format=False):
     tabulate(rows, sortby=dict(key=lambda r: r[0]))
 
 def show_artifacts(projects, artifacts, scope, short_format=False, strategy=None):
-    project_names = ['{} #{}'.format(projects[key], key) for key in projects]
+    project_names = ['{} #{}'.format(p.full_path, id) for id, p in projects.items()]
     projects = ", ".join(sorted(project_names))
     if not len(artifacts):
         raise GitlabArtifactsError("No "+scope+" were found for "+projects)
@@ -151,13 +154,13 @@ def run_command(db, args):
         if args.dry_run:
             artifacts = list_archive_artifacts(
                 db,
-                projects.keys(),
+                projects,
                 args.strategy
                 )
             show_artifacts(projects, artifacts, "expired artifacts", strategy=args.strategy)
         else:
             with db:
-                archive_artifacts(db, projects.keys(), args.strategy)
+                archive_artifacts(db, projects, args.strategy)
     else:
         raise Exception("Command {} not implemented".format(args.command))
 
@@ -174,14 +177,14 @@ def glartifacts():
     try:
         switch_user()
     except PermissionError:
-        log.error("Unable to switch to gitlab-psql user")
+        log.error("Permission Denied. Unable to switch to GitLab's git user.")
         return 1
 
     db = None
     try:
         db = psycopg2.connect(
             database="gitlabhq_production",
-            user="gitlab-psql",
+            user="gitlab",
             host="/var/opt/gitlab/postgresql",
             port="5432")
 

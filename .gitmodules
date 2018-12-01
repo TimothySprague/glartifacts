@@ -1,0 +1,3 @@
+[submodule "ext/gitaly-proto"]
+	path = ext/gitaly-proto
+	url = git@gitlab.com:gitlab-org/gitaly-proto.git
