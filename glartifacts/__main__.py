@@ -8,6 +8,7 @@ import traceback
 import psycopg2
 
 from . import log
+from .config import load_config
 from .errors import GitlabArtifactsError
 from .gitaly import GitalyClient
 from .projects import find_project, list_projects, list_artifacts
@@ -20,14 +21,12 @@ def switch_user():
     os.setgid(gluser.pw_gid)
     os.setuid(gluser.pw_uid)
 
-def resolve_projects(db, project_paths):
+def resolve_projects(db, gitaly, project_paths):
     projects = {}
-    with GitalyClient() as gitaly:
-        for project_path in project_paths:
-            project = find_project(db, project_path)
-            project.branches = gitaly.get_branches(project)
-
-            projects[project.id] = project
+    for project_path in project_paths:
+        project = find_project(db, project_path)
+        project.branches = gitaly.get_branches(project)
+        projects[project.id] = project
 
     return projects
 
@@ -141,16 +140,16 @@ def show_artifacts(projects, artifacts, scope, short_format=False, strategy=None
         dict(key=lambda r: (int(r[0][1:])), reverse=True),
         ])
 
-def run_command(db, args):
+def run_command(db, gitaly, args):
     if args.command == 'list':
         if args.projects:
-            projects = resolve_projects(db, args.projects)
+            projects = resolve_projects(db, gitaly, args.projects)
             artifacts = list_artifacts(db, projects.keys())
             show_artifacts(projects, artifacts, "artifacts", args.short)
         else:
             show_projects(db, args.short)
     elif args.command == 'archive':
-        projects = resolve_projects(db, args.projects)
+        projects = resolve_projects(db, gitaly, args.projects)
         if args.dry_run:
             artifacts = list_archive_artifacts(
                 db,
@@ -174,6 +173,8 @@ def glartifacts():
     if not args:
         sys.exit(1)
 
+    config = load_config()
+
     try:
         switch_user()
     except PermissionError:
@@ -183,12 +184,14 @@ def glartifacts():
     db = None
     try:
         db = psycopg2.connect(
-            database="gitlabhq_production",
-            user="gitlab",
-            host="/var/opt/gitlab/postgresql",
-            port="5432")
+            database=config['postgres']['dbname'],
+            user=config['postgres']['user'],
+            host=config['postgres']['host'],
+            port=config['postgres']['port'],
+            )
 
-        run_command(db, args)
+        with GitalyClient(config['gitaly']['address']) as gitaly:
+            run_command(db, gitaly, args)
 
     finally:
         if db:
