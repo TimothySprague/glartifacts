@@ -131,11 +131,11 @@ The table below lists the available configuration options:
 
 |Section   |Option   |ENV var   |Default |
 |----------|---------|----------|--------|
-|postgres |dbname |GLARTIFACTS_DBNAME |gitlabhq_production |
-|postgres |user |GLARTIFACTS_DBUSER |gitlab |
-|postgres |host |GLARTIFACTS_DBHOST |/var/opt/gitlab/postgresql |
-|postgres |port |GLARTIFACTS_DBPORT |5432 |
-|gitaly |address |GLARTIFACTS_GITALYADDR |unix:/var/opt/gitlab/gitaly/gitaly.socket |
+|postgres |dbname |`GLARTIFACTS_DBNAME` |`gitlabhq_production` |
+|postgres |user |`GLARTIFACTS_DBUSER` |`gitlab` |
+|postgres |host |`GLARTIFACTS_DBHOST` |`/var/opt/gitlab/postgresql` |
+|postgres |port |`GLARTIFACTS_DBPORT` |`5432` |
+|gitaly |address |`GLARTIFACTS_GITALYADDR` |`unix:/var/opt/gitlab/gitaly/gitaly.socket` |
 
 The following paths are searched for the glartifacts.conf. Settings are merged
 for each conf file found: `Defaults` > `System Settings` > `User Settings`.
