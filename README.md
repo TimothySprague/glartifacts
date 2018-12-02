@@ -120,3 +120,25 @@ Pipeline Job       Scheduled At        Built At            Status  Tag? Expiring
 #8       awesomify 2018-03-14 10:14:48 2018-03-19 10:29:45 success no   yes       2.73 KiB 
 #6       awesomify 2018-02-23 04:02:01 2018-03-19 10:28:15 success no   yes       2.75 KiB 
 ```
+
+## Configuration using glartifacts.conf
+Glartifacts requires access to the GitLab database and Gitaly server. The 
+default connection settings are based on an omnibus install, but can be
+modified for custom deployments via settings in glartifacts.conf. You can
+also override any of the configured settings using environment variables.
+
+The table below lists the available configuration options:
+|Section   |Option   |ENV var   |Default |
+|----------|---------|----------|--------|
+|postgres |dbname |GLARTIFACTS_DBNAME |gitlabhq_production |
+|postgres |user |GLARTIFACTS_DBUSER |gitlab |
+|postgres |host |GLARTIFACTS_DBHOST |/var/opt/gitlab/postgresql |
+|postgres |port |GLARTIFACTS_DBPORT |5432 |
+|gitaly |address |GLARTIFACTS_GITALYADDR |unix:/var/opt/gitlab/gitaly/gitaly.socket |
+
+The following paths are searched for the glartifacts.conf. Settings are merged
+for each conf file found: `Defaults` > `System Settings` > `User Settings`.
+```
+$HOME/.config/glartifacts/glartifacts.conf
+/etc/glartifacts/glartifacts.conf
+```
