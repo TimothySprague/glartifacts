@@ -128,6 +128,7 @@ modified for custom deployments via settings in glartifacts.conf. You can
 also override any of the configured settings using environment variables.
 
 The table below lists the available configuration options:
+
 |Section   |Option   |ENV var   |Default |
 |----------|---------|----------|--------|
 |postgres |dbname |GLARTIFACTS_DBNAME |gitlabhq_production |
