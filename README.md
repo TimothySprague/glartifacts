@@ -55,20 +55,20 @@ time. Expired artifacts will be removed when the next Sidekiq task is
 executed.
 
 ```
-usage: glartifacts [-h] [-d] [--verbose] [-v]  ...
+usage: glartifacts archive [-h] [--dry-run]
+                           [-s {LASTGOOD_BUILD,LASTGOOD_PIPELINE}]
+                           PROJECT [PROJECT ...]
 
-GitLab Artifact Archiver
+positional arguments:
+  PROJECT               paths to the projects to archive
 
 optional arguments:
-  -h, --help     show this help message and exit
-  -d, --debug    show detailed debug information
-  --verbose      show additional information
-  -v, --version  show program's version number and exit
-
-Commands:
-
-    list         List build artifacts
-    archive      Archive build artifacts for a project
+  -h, --help            show this help message and exit
+  --dry-run             identify artifacts to be archived, but do not make any
+                        changes
+  -s {LASTGOOD_BUILD,LASTGOOD_PIPELINE}, --strategy {LASTGOOD_BUILD,LASTGOOD_PIPELINE}
+                        select the archive strategy used to identify old
+                        artifacts (default: LASTGOOD_BUILD)
 ```
 The `--strategy` option selects the heuristic used to identify expired
 artifacts. An archive strategy determines a point in time where artifacts are
