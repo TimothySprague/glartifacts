@@ -30,14 +30,14 @@ def _load_project_branches(cursor, projects):
         "create temp table __project_branches (id int, ref varchar) on commit drop"
         )
 
-    # Get a flattened list of (id, ref) tuples
+    # Get a flattened list of tab-delimited (project_id, branch_name) tuples
     items = map(
-        lambda p: ['{}\t{}\n'.format(p.id, branch) for branch in p.branches],
+        lambda p: ['{}\t{}\n'.format(p.id, branch.name) for branch in p.branches],
         projects.values()
         )
     items = itertools.chain.from_iterable(items)
 
-    # psql copy_from requires a tab-delimited value
+    # psql copy_from requires a tab-delimited fileobj one row per-line
     data = io.StringIO()
     for row in items:
         data.write(row)

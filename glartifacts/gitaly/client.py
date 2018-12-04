@@ -26,14 +26,20 @@ class GitalyClient(object):
             relative_path=project.disk_path,
             gl_repository=project.gl_repository,
             )
-        request = ref_pb2.FindAllBranchNamesRequest(
+        request = ref_pb2.FindAllBranchesRequest(
             repository=repository
             )
 
-        response = list(self._ref_service.FindAllBranchNames(request))
+        response = list(self._ref_service.FindAllBranches(request))
         assert len(response) == 1 # Shouldn't this be Unary?
 
-        branches = [ref.decode('utf-8').split('/')[-1] for ref in response[0].names]
+        branches = []
+        for branch in response[0].branches:
+            ref = (
+                branch.name.decode('utf-8').split('/')[-1],
+                branch.target.id,
+                )
+            branches.append(ref)
         assert len(branches) > 0 # Safety check for failed requests
 
         return branches

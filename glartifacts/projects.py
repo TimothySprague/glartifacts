@@ -10,7 +10,17 @@ class Project(object):
         self.full_path = path
         self.disk_path = self.full_path + '.git'
         self.gl_repository = 'project-{}'.format(id)
-        self.projects = None
+        self.branches = []
+
+    def add_branch(self, name, commit):
+        ref = Ref(name, commit)
+
+        self.branches.append(ref)
+
+class Ref(object):
+    def __init__(self, name, commit):
+        self.name = name
+        self.commit = commit
 
 def get_project(db, path, parent_id):
     project = None

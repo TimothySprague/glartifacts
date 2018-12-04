@@ -25,8 +25,12 @@ def resolve_projects(db, gitaly, project_paths):
     projects = {}
     for project_path in project_paths:
         project = find_project(db, project_path)
-        project.branches = gitaly.get_branches(project)
         projects[project.id] = project
+
+        # Load branches
+        branches = gitaly.get_branches(project)
+        for branch, commit in branches:
+            project.add_branch(branch, commit)
 
     return projects
 
