@@ -1,7 +1,25 @@
 import psycopg2
 import psycopg2.extras
+import yaml
 
 from .errors import NoProjectError
+
+GITLAB_CI_RESERVED = [
+    'image',
+    'services',
+    'stages',
+    'types',
+    'before_script',
+    'after_script',
+    'variables',
+    'cache',
+    ]
+
+def ishidden(name):
+    return name.startswith('.')
+
+def isreserved(name):
+    return name in GITLAB_CI_RESERVED
 
 class Project(object):
     def __init__(self, id, path, storage):
@@ -13,14 +31,30 @@ class Project(object):
         self.branches = []
 
     def add_branch(self, name, commit):
-        ref = Ref(name, commit)
+        branch = Branch(name, commit)
+        self.branches.append(branch)
 
-        self.branches.append(ref)
+        return branch
 
 class Ref(object):
     def __init__(self, name, commit):
         self.name = name
         self.commit = commit
+
+class Branch(Ref):
+    def __init__(self, name, commit):
+        self.job_names = []
+
+        super().__init__(name, commit)
+
+    def load_ci_config(self, config_data):
+        config = yaml.load(config_data)
+
+        jobs = filter(
+            lambda key: not ishidden(key) and not isreserved(key),
+            config.keys()
+            )
+        self.job_names = list(jobs)
 
 def get_project(db, path, parent_id):
     project = None

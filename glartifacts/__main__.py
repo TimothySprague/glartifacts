@@ -13,7 +13,7 @@ from .errors import GitlabArtifactsError
 from .gitaly import GitalyClient
 from .projects import find_project, list_projects, list_artifacts
 from .archive import list_archive_artifacts, archive_artifacts, ArchiveStrategy
-from .utils import tabulate, humanize_datetime, humanize_size
+from .utils import tabulate, humanize_datetime, humanize_size, memoize
 from .version import __version__
 
 def switch_user():
@@ -21,16 +21,38 @@ def switch_user():
     os.setgid(gluser.pw_gid)
     os.setuid(gluser.pw_uid)
 
+@memoize(
+    key=lambda args: (args[1].id, args[2],) # memoize over project_id and commit
+    )
+def get_ci_config(gitaly, project, commit):
+    oid, size, data = gitaly.get_tree_entry(
+        project,
+        commit,
+        '.gitlab-ci.yml',
+        )
+
+    # Gitaly returns an empty response if not found
+    if not oid:
+        return None
+
+    return data
+
 def resolve_projects(db, gitaly, project_paths):
     projects = {}
+    ci_config = {}
     for project_path in project_paths:
         project = find_project(db, project_path)
         projects[project.id] = project
 
         # Load branches
         branches = gitaly.get_branches(project)
-        for branch, commit in branches:
-            project.add_branch(branch, commit)
+        for name, commit in branches:
+            branch = project.add_branch(name, commit)
+
+            # Load branch jobs via .gitlab-ci.yml
+            config_data = get_ci_config(gitaly, project, commit)
+            if config_data:
+                branch.load_ci_config(config_data)
 
     return projects
 
