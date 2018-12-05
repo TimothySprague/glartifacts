@@ -73,8 +73,8 @@ def get_args():
         '-s', '--strategy',
         type=ArchiveStrategy.parse,
         choices=list(ArchiveStrategy),
-        default=ArchiveStrategy.LASTGOOD_BUILD,
-        help='select the archive strategy used to identify old artifacts (default: LASTGOOD_BUILD)',
+        default=ArchiveStrategy.LASTGOOD_JOB,
+        help='select the archive strategy used to identify old artifacts (default: LASTGOOD_JOB)',
         )
     args = parser.parse_args()
     if not args.command:
