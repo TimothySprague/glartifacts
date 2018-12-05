@@ -1,3 +1,8 @@
+# v1.2.1
+* Rename LASTGOOD_BUILD to LASTGOOD_JOB. This is consistent with GitLab's modern
+vocabulary (jobs, not builds)
+
+
 # v1.2
 Use Gitaly to extend project metdata
 

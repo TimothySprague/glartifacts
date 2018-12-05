@@ -9,8 +9,8 @@ from . import log
 from .utils import indent
 
 class ArchiveStrategy(enum.Enum):
-    # Keep good artifacts per-build
-    LASTGOOD_BUILD = 1
+    # Keep good artifacts per-job
+    LASTGOOD_JOB = 1
 
     # Keep good artifacts per-pipeline
     LASTGOOD_PIPELINE = 2
@@ -46,8 +46,8 @@ def _load_project_branches(cursor, projects):
     cursor.copy_from(data, '__project_branches', columns=('id', 'ref'))
 
 def get_archive_strategy_query(strategy):
-    if strategy == ArchiveStrategy.LASTGOOD_BUILD:
-        return Query.lastgood.format(Query.good_build)
+    if strategy == ArchiveStrategy.LASTGOOD_JOB:
+        return Query.lastgood.format(Query.good_job)
     elif strategy == ArchiveStrategy.LASTGOOD_PIPELINE:
         return Query.lastgood.format(Query.good_pipeline)
 
@@ -78,7 +78,7 @@ def archive_artifacts(db, projects, strategy):
             cur.execute(sql, dict(project_id=tuple(projects.keys())))
 
 class Query():
-    # Find the date of the most recent good pipeline and build
+    # Find the date of the most recent good pipeline and job
     lastgood = """
 with lastgood as (
 select lg.project_id, lg.name, lg.ref, lg.pipeline_date,
@@ -101,14 +101,14 @@ group by lg.project_id, lg.name, lg.ref, lg.pipeline_date
 )
 """
 
-    # Criteria that define "good" for Build or Pipeline
-    good_build = "(b.status='success' or b.allow_failure)"
+    # Criteria that define "good" for Job or Pipeline
+    good_job = "(b.status='success' or b.allow_failure)"
     good_pipeline = "(p.status='success')"
 
     # Identifies old artifacts based on a lastgood strategy
     # "old" is defined as:
     #    Older than the lastgood pipeline OR
-    #       older than the lastgood build within the lastgood pipeline
+    #       older than the lastgood job within the lastgood pipeline
     #    Not tagged
     #    Not already expired
     #    Has artifacts file_type=1 (zip)

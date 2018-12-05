@@ -56,7 +56,7 @@ executed.
 
 ```
 usage: glartifacts archive [-h] [--dry-run]
-                           [-s {LASTGOOD_BUILD,LASTGOOD_PIPELINE}]
+                           [-s {LASTGOOD_JOB,LASTGOOD_PIPELINE}]
                            PROJECT [PROJECT ...]
 
 positional arguments:
@@ -66,9 +66,9 @@ optional arguments:
   -h, --help            show this help message and exit
   --dry-run             identify artifacts to be archived, but do not make any
                         changes
-  -s {LASTGOOD_BUILD,LASTGOOD_PIPELINE}, --strategy {LASTGOOD_BUILD,LASTGOOD_PIPELINE}
+  -s {LASTGOOD_JOB,LASTGOOD_PIPELINE}, --strategy {LASTGOOD_JOB,LASTGOOD_PIPELINE}
                         select the archive strategy used to identify old
-                        artifacts (default: LASTGOOD_BUILD)
+                        artifacts (default: LASTGOOD_JOB)
 ```
 The `--strategy` option selects the heuristic used to identify expired
 artifacts. An archive strategy determines a point in time where artifacts are
@@ -80,7 +80,7 @@ The strategies available are listed below.
 |Name              |Description    |
 |------------------|---------------|
 |LASTGOOD_PIPELINE |Keep artifacts from all jobs in the last successful pipeline. The entire pipeline must succeed to advance the expiration point-in-time.|
-|LASTGOOD_BUILD    |Keep artifacts from the last successful job. The point-in-time is advanced any time the job succeeds, even if its pipeline fails.|
+|LASTGOOD_JOB    |Keep artifacts from the last successful job. The point-in-time is advanced any time the job succeeds, even if its pipeline fails.|
 
 The `--dry-run` option lists the artifacts that would be removed by the
 selected strategy.
