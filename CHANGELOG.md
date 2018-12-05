@@ -1,7 +1,9 @@
 # v1.2.1
-* Rename LASTGOOD_BUILD to LASTGOOD_JOB. This is consistent with GitLab's modern
+* Rename `LASTGOOD_BUILD` to `LASTGOOD_JOB`. This is consistent with GitLab's modern
 vocabulary (jobs, not builds)
-
+* Simplify the `project_id` filter in the artifact archive queries
+* Resolve project paths correctly when there are nested parent groups
+* Account job artifacts where `job_artifact.size` is null
 
 # v1.2
 Use Gitaly to extend project metdata
@@ -24,4 +26,4 @@ Initial version of GitLab Artifacts Tools
 
 * Added list command that prints projects with artifacts
 * Added archive command that marks expired artifacts as expired
-* Implemented two archive strategies LASTGOOD_PIPELINE and LASTGOOD_BUILD
+* Implemented two archive strategies `LASTGOOD_PIPELINE` and `LASTGOOD_BUILD`
