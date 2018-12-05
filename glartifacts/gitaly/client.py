@@ -41,8 +41,16 @@ class GitalyClient(object):
             repository=repository
             )
 
-        response = list(self._refsvc.FindAllBranches(request))
-        assert len(response) == 1 # Shouldn't this be Unary?
+        try:
+            response = list(self._refsvc.FindAllBranches(request))
+            assert len(response) == 1 # Shouldn't this be Unary?
+        except grpc.RpcError as e:
+            raise GitlabArtifactsError(
+                'RefSvc.FindAllBranches failed with error {}:{}'.format(
+                    e.code(),
+                    e.details()
+                    )
+                )
 
         branches = []
         for branch in response[0].branches:
@@ -55,21 +63,37 @@ class GitalyClient(object):
 
         return branches
 
-    def get_tree_entry(self, project, commit_id, path):
-        repository = self._project_repo(project)
+    def get_tree_entry(self, ref, path):
+        repository = self._project_repo(ref.project)
 
         request = commit_pb2.TreeEntryRequest(
             repository=repository,
-            revision=commit_id.encode('utf-8'),
+            revision=ref.commit.encode('utf-8'),
             path=path.encode('utf-8'),
             limit = 0,
             )
-        response = list(self._commitsvc.TreeEntry(request))
-        assert len(response) == 1 # Shouldn't this be Unary?
 
+        try:
+            # This should raise RpcError - on notfound, but it doesn't?
+            response = list(self._commitsvc.TreeEntry(request))
+            assert len(response) == 1 # Shouldn't this be Unary?
+        except grpc.RpcError as e:
+            raise GitlabArtifactsError(
+                'CommitSvc.TreeEntry failed with error {}:{}'.format(
+                    e.code(),
+                    e.details()
+                    )
+                )
+        
         entry = response[0]
-        return (
-            entry.oid,
-            entry.size,
-            entry.data,
-            )
+
+        # Ensure we receive type=BLOB, failed requests return type=COMMIT
+        blob = None
+        if entry.type == 1:
+            blob = (
+                entry.oid,
+                entry.size,
+                entry.data,
+                )
+
+        return blob if blob else (None,)*3
