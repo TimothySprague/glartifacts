@@ -25,11 +25,11 @@ def get_project(db, path, parent_id):
 
     return project
 
-def get_namespace_id(db, path, parent_id):
+def get_namespace_id(db, path_component, parent_id):
     ns = None
     with db:
         with db.cursor() as cur:
-            cur.execute(Query.get_namespace, dict(path=path, parent_id=parent_id))
+            cur.execute(Query.get_namespace, dict(path=path_component, parent_id=parent_id))
             ns = cur.fetchone()
 
     if not ns:
@@ -41,25 +41,25 @@ def walk_namespaces(db, namespaces, project_path, parent_id=None):
     if not namespaces:
         return get_project(db, project_path, parent_id)
 
-    ns = namespaces.pop(0)
-    ns_id = get_namespace_id(db, ns, parent_id)
+    ns_path = namespaces.pop(0)
+    ns_id = get_namespace_id(db, ns_path, parent_id)
 
     return walk_namespaces(db, namespaces, project_path, ns_id)
 
-def find_project(db, project_path):
-    namespaces = project_path.split('/')
+def find_project(db, full_path):
+    namespaces = full_path.split('/')
     if not namespaces:
         raise NoProjectError
 
-    path = namespaces.pop()
+    project_path = namespaces.pop()
     id, storage = walk_namespaces(
             db,
             namespaces,
-            path)
+            project_path)
 
     return Project(
             id,
-            project_path,
+            full_path,
             storage
             )
 
@@ -77,11 +77,20 @@ def list_artifacts(db, project_ids):
 
 class Query():
     projects_with_artifacts = """
+with recursive ns_paths(id, parent_id, path) as (
+    select n.id, n.parent_id, n.path
+        from namespaces as n
+        where n.parent_id is NULL
+    union all
+    select c.id, c.parent_id, (p.path || '/' || c.path) as path
+        from namespaces as c
+        inner join ns_paths as p on p.id=c.parent_id
+)
 select a.project_id, p.path as project, n.path as namespace,
     count(distinct a.job_id) as artifact_count
 from ci_job_artifacts as a
 inner join projects as p on p.id=a.project_id
-left join namespaces as n on p.namespace_id=n.id
+left join ns_paths as n on p.namespace_id=n.id
 where a.file_type <> 3
 group by a.project_id, p.path, n.path
 """
