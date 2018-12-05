@@ -62,7 +62,7 @@ def list_archive_artifacts(db, projects, strategy):
     with db:
         with db.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
             _load_project_branches(cur, projects)
-            cur.execute(sql, dict(project_id=tuple(projects.keys())))
+            cur.execute(sql)
             return cur.fetchall()
 
 def archive_artifacts(db, projects, strategy):
@@ -75,7 +75,7 @@ def archive_artifacts(db, projects, strategy):
     with db:
         with db.cursor() as cur:
             _load_project_branches(cur, projects)
-            cur.execute(sql, dict(project_id=tuple(projects.keys())))
+            cur.execute(sql)
 
 class Query():
     # Find the date of the most recent good pipeline and job
@@ -87,10 +87,10 @@ from (
     select b.project_id, b.name, b.ref,
             max(p.created_at) as pipeline_date
     from ci_builds as b
+    join __project_branches as pb on pb.id=b.project_id
     join ci_stages as s on s.id=b.stage_id
     join ci_pipelines as p on p.id=s.pipeline_id
-    where b.project_id in %(project_id)s and
-        {}
+    where {}
     group by b.project_id, b.name, b.ref
 ) as lg
 join ci_builds as b on b.project_id=lg.project_id and b.name=lg.name and b.ref=lg.ref
