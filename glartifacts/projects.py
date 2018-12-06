@@ -78,11 +78,11 @@ def list_artifacts(db, project_ids):
 class Query():
     projects_with_artifacts = """
 with recursive ns_paths(id, parent_id, path) as (
-    select n.id, n.parent_id, n.path
+    select n.id, n.parent_id, n.path::text
         from namespaces as n
         where n.parent_id is NULL
     union all
-    select c.id, c.parent_id, (p.path || '/' || c.path) as path
+    select c.id, c.parent_id, (p.path || '/' || c.path)::text as path
         from namespaces as c
         inner join ns_paths as p on p.id=c.parent_id
 )
