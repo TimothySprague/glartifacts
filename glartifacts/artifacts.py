@@ -8,7 +8,7 @@ import psycopg2.extras
 from . import log
 from .utils import indent
 
-class ArchiveStrategy(enum.Enum):
+class ExpirationStrategy(enum.Enum):
     # Keep good artifacts per-job
     LASTGOOD_JOB = 1
 
@@ -21,7 +21,7 @@ class ArchiveStrategy(enum.Enum):
     @staticmethod
     def parse(value):
         try:
-            return ArchiveStrategy[value]
+            return ExpirationStrategy[value]
         except KeyError:
             return None
 
@@ -51,19 +51,19 @@ def _load_project_branches(cursor, projects):
 
     cursor.copy_from(data, '__project_branch_jobs', columns=('id', 'ref', 'job'))
 
-def get_archive_strategy_query(strategy):
-    if strategy == ArchiveStrategy.LASTGOOD_JOB:
+def get_removal_strategy_query(strategy):
+    if strategy == ExpirationStrategy.LASTGOOD_JOB:
         return Query.lastgood.format(Query.good_job)
-    elif strategy == ArchiveStrategy.LASTGOOD_PIPELINE:
+    elif strategy == ExpirationStrategy.LASTGOOD_PIPELINE:
         return Query.lastgood.format(Query.good_pipeline)
 
     raise Exception("Strategy {} not implemented".format(strategy.name))
 
-def list_archive_artifacts(db, projects, strategy):
-    strategy_query = get_archive_strategy_query(strategy)
+def list_remove_artifacts(db, projects, strategy):
+    strategy_query = get_removal_strategy_query(strategy)
     action_query = Query.artifact_list.format(Query.identify_artifacts)
     sql = strategy_query + action_query
-    log.debug("Running %s archive query:\n  %s", strategy.name, indent(sql))
+    log.debug("Running %s list remove artifacts query:\n  %s", strategy.name, indent(sql))
 
     with db:
         with db.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
@@ -71,12 +71,12 @@ def list_archive_artifacts(db, projects, strategy):
             cur.execute(sql)
             return cur.fetchall()
 
-def archive_artifacts(db, projects, strategy):
-    strategy_query = get_archive_strategy_query(strategy)
+def remove_artifacts(db, projects, strategy):
+    strategy_query = get_removal_strategy_query(strategy)
     action_query = Query.artifact_expire.format(Query.identify_artifacts)
 
     sql = strategy_query + action_query
-    log.debug("Running %s archive query:\n  %s", strategy.name, indent(sql))
+    log.debug("Running %s remove artifacts query:\n  %s", strategy.name, indent(sql))
 
     with db:
         with db.cursor() as cur:

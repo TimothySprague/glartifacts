@@ -5,7 +5,7 @@ Set of python utilities for managing GitLab artifacts.
 # glartifacts -h
 usage: glartifacts [-h] [-d] [--verbose] [-v]  ...
 
-GitLab Artifact Archiver
+GitLab Artifact Tools
 
 optional arguments:
   -h, --help     show this help message and exit
@@ -14,9 +14,9 @@ optional arguments:
   -v, --version  show program's version number and exit
 
 Commands:
-
-    list         list build artifacts
-    archive      archive build artifacts for a project
+  
+    list         List build artifacts
+    remove       Remove old build artifacts for a project
 ```
 
 ### list
@@ -30,51 +30,54 @@ optional arguments:
   -h, --help   show this help message and exit
   -s, --short  use a short list format that only prints project names
 ```
-When one or more optional
-project paths are provided, this command prints detailed information about
-each artifact, including: schedule date, build date, tagged build, and size.
+When one or more optional project paths are provided, this command prints
+detailed information about each artifact, including: pipeline id, job name, 
+schedule date, build status, the ref used to build, and size.
 
 #### Example
 ```
 # glartifacts list $(glartifacts list -s)
-Listing artifacts for awesomesoft/awesome-core 
+Listing artifacts for awesome-people/awesome-prod #1
 
-Pipeline Job       Scheduled At        Built At            Status  Tag? Expiring? Size     
--------- --------- ------------------- ------------------- ------- ---- --------- -------- 
-#13      awesomify 2018-03-18 11:58:26 2018-03-19 10:27:47 success no   no        2.73 KiB 
-#13      awesomify 2018-03-18 11:58:26 2018-03-18 11:58:26 success no   no        2.73 KiB 
-#11      awesomify 2018-03-17 09:55:40 2018-03-19 10:28:02 success no   no        2.73 KiB 
-#9       awesomify 2018-03-15 10:40:58 2018-03-19 10:28:25 success no   no        2.73 KiB 
-#8       awesomify 2018-03-14 10:14:48 2018-03-19 10:29:45 success no   no        2.73 KiB 
-#6       awesomify 2018-02-23 04:02:01 2018-03-19 10:28:15 success no   no        2.75 KiB 
+Pipeline Job           Scheduled At        Status  Ref               Tag? Expiring? Size     
+-------- -------- ---- ------------------- ------- ----------------- ---- --------- -------- 
+#54      build    #105 2018-12-06 09:54:01 success master            no   no        537.00 B 
+#54      test-all #106 2018-12-06 09:54:01 success master            no   no        519.00 B 
+#53      build    #103 2018-12-06 09:53:03 success test-failing-jobs no   no        537.00 B 
+#53      test-all #104 2018-12-06 09:53:03 failed  test-failing-jobs no   no        519.00 B 
+#52      build    #101 2018-12-06 09:51:10 success test-failing-jobs no   no        537.00 B 
+#52      test-all #102 2018-12-06 09:51:10 failed  test-failing-jobs no   no        519.00 B 
+#19      build    #39  2018-12-01 11:51:25 success 1.0               yes  no        537.00 B 
+#19      test     #40  2018-12-01 11:51:25 success 1.0               yes  no        519.00 B 
 ```
 
-### archive
+### remove
 Marks GitLab CI artifacts as expired using expiration strategies rather than
-time. Expired artifacts will be removed when the next Sidekiq task is
+time. Expired artifacts will be removed when the next `Sidekiq` task is
 executed.
 
 ```
-usage: glartifacts archive [-h] [--dry-run]
-                           [-s {LASTGOOD_JOB,LASTGOOD_PIPELINE}]
-                           PROJECT [PROJECT ...]
+usage: glartifacts remove [-h] [--dry-run]
+                          [-s {LASTGOOD_JOB,LASTGOOD_PIPELINE}]
+                          PROJECT [PROJECT ...]
 
 positional arguments:
-  PROJECT               paths to the projects to archive
+  PROJECT               paths to the projects whose artifacts should be
+                        removed
 
 optional arguments:
   -h, --help            show this help message and exit
-  --dry-run             identify artifacts to be archived, but do not make any
+  --dry-run             identify artifacts to be removed, but do not make any
                         changes
   -s {LASTGOOD_JOB,LASTGOOD_PIPELINE}, --strategy {LASTGOOD_JOB,LASTGOOD_PIPELINE}
-                        select the archive strategy used to identify old
+                        select the expiration strategy used to identify old
                         artifacts (default: LASTGOOD_PIPELINE)
 ```
 
 The `--strategy` option selects the heuristic used to identify expired
-artifacts. An archive strategy determines a point in time where artifacts are
+artifacts. An expiration strategy determines a point in time where artifacts are
 known to be good. Artifacts before that point-in-time are removed. Tagged
-artifacts are never removed.
+artifacts are **never** removed.
 
 The strategies available are listed below.
 
@@ -90,36 +93,34 @@ selected strategy.
 
 List old artifacts for all projects
 ```
-# glartifacts archive --dry-run $(glartifacts list -s)
-Listing expired artifacts for awesomesoft/awesome-core 
+# glartifacts remove --dry-run $(glartifacts list -s)
+Listing expired artifacts for awesome-people/awesome-prod #1
 
-Pipeline Job       Scheduled At        Built At            Status  Tag? Expiring? Size     
--------- --------- ------------------- ------------------- ------- ---- --------- -------- 
-#13      awesomify 2018-03-18 11:58:26 2018-03-18 11:58:26 success no   no        2.73 KiB 
-#11      awesomify 2018-03-17 09:55:40 2018-03-19 10:28:02 success no   no        2.73 KiB 
-#9       awesomify 2018-03-15 10:40:58 2018-03-19 10:28:25 success no   no        2.73 KiB 
-#8       awesomify 2018-03-14 10:14:48 2018-03-19 10:29:45 success no   no        2.73 KiB 
-#6       awesomify 2018-02-23 04:02:01 2018-03-19 10:28:15 success no   no        2.75 KiB
+Pipeline Job          Scheduled At        Status  Ref    Tag? Expiring? Size     
+-------- -------- --- ------------------- ------- ------ ---- --------- -------- 
+#49      build    #95 2018-12-06 09:43:38 success master no   no        537.00 B 
+#49      test-all #96 2018-12-06 09:43:38 success master no   no        519.00 B
 ```
-Mark the old artifacts as expired
+
+Mark old artifacts as expired
 ```
-# glartifacts archive awesomesoft/awesome-core
+# glartifacts remove awesomesoft/awesome-core
 ```
 
 List the current state of the project's artifacts. Artifacts are removed
-from this list by Sidekiq.
+from this list by `Sidekiq`.
 ```
-# glartifacts list awesomesoft/awesome-core
-Listing artifacts for awesomesoft/awesome-core 
+# glartifacts list awesome-people/awesome-prod
+Listing artifacts for awesome-people/awesome-prod #1
 
-Pipeline Job       Scheduled At        Built At            Status  Tag? Expiring? Size     
--------- --------- ------------------- ------------------- ------- ---- --------- -------- 
-#13      awesomify 2018-03-18 11:58:26 2018-03-19 10:27:47 success no   no        2.73 KiB 
-#13      awesomify 2018-03-18 11:58:26 2018-03-18 11:58:26 success no   yes       2.73 KiB 
-#11      awesomify 2018-03-17 09:55:40 2018-03-19 10:28:02 success no   yes       2.73 KiB 
-#9       awesomify 2018-03-15 10:40:58 2018-03-19 10:28:25 success no   yes       2.73 KiB 
-#8       awesomify 2018-03-14 10:14:48 2018-03-19 10:29:45 success no   yes       2.73 KiB 
-#6       awesomify 2018-02-23 04:02:01 2018-03-19 10:28:15 success no   yes       2.75 KiB 
+Pipeline Job           Scheduled At        Status  Ref               Tag? Expiring? Size     
+-------- -------- ---- ------------------- ------- ----------------- ---- --------- -------- 
+#54      build    #105 2018-12-06 09:54:01 success master            no   no        537.00 B 
+#54      test-all #106 2018-12-06 09:54:01 success master            no   no        519.00 B 
+#49      test-all #96  2018-12-06 09:43:38 success master            no   yes       519.00 B 
+#49      build    #95  2018-12-06 09:43:38 success master            no   yes       537.00 B 
+#19      build    #39  2018-12-01 11:51:25 success 1.0               yes  no        537.00 B 
+#19      test     #40  2018-12-01 11:51:25 success 1.0               yes  no        519.00 B 
 ```
 
 ## Configuration using glartifacts.conf

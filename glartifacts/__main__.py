@@ -12,7 +12,7 @@ from .config import load_config
 from .errors import GitlabArtifactsError, NoProjectError, InvalidCIConfigError
 from .gitaly import GitalyClient
 from .projects import find_project, list_projects, list_artifacts
-from .archive import list_archive_artifacts, archive_artifacts, ArchiveStrategy
+from .artifacts import list_remove_artifacts, remove_artifacts, ExpirationStrategy
 from .utils import tabulate, humanize_datetime, humanize_size, memoize
 from .version import __version__
 
@@ -77,7 +77,7 @@ def resolve_projects(db, gitaly, project_paths):
 def get_args():
     parser = argparse.ArgumentParser(
         prog='glartifacts',
-        description='GitLab Artifact Archiver')
+        description='GitLab Artifact Tools')
     parser.add_argument(
         '-d', '--debug',
         action="store_true",
@@ -103,22 +103,22 @@ def get_args():
         action='store_true',
         help='use a short list format that only prints project names')
 
-    archivecmd = commands.add_parser("archive", help='Archive build artifacts for a project')
-    archivecmd.add_argument(
+    removecmd = commands.add_parser("remove", help='Remove old build artifacts for a project')
+    removecmd.add_argument(
         'projects',
         metavar='PROJECT',
         nargs='+',
-        help='paths to the projects to archive')
-    archivecmd.add_argument(
+        help='paths to the projects whose artifacts should be removed')
+    removecmd.add_argument(
         '--dry-run',
         action="store_true",
-        help='identify artifacts to be archived, but do not make any changes')
-    archivecmd.add_argument(
+        help='identify artifacts to be removed, but do not make any changes')
+    removecmd.add_argument(
         '-s', '--strategy',
-        type=ArchiveStrategy.parse,
-        choices=list(ArchiveStrategy),
-        default=ArchiveStrategy.LASTGOOD_PIPELINE,
-        help='select the archive strategy used to identify old artifacts (default: LASTGOOD_PIPELINE)',
+        type=ExpirationStrategy.parse,
+        choices=list(ExpirationStrategy),
+        default=ExpirationStrategy.LASTGOOD_PIPELINE,
+        help='select the expiration strategy used to identify old artifacts (default: LASTGOOD_PIPELINE)',
         )
     args = parser.parse_args()
     if not args.command:
@@ -197,9 +197,9 @@ def run_command(db, gitaly, args):
             show_artifacts(projects, artifacts, "artifacts", args.short)
         else:
             show_projects(db, args.short)
-    elif args.command == 'archive':
+    elif args.command == 'remove':
         if args.dry_run:
-            artifacts = list_archive_artifacts(
+            artifacts = list_remove_artifacts(
                 db,
                 projects,
                 args.strategy
@@ -207,7 +207,7 @@ def run_command(db, gitaly, args):
             show_artifacts(projects, artifacts, "expired artifacts", strategy=args.strategy)
         else:
             with db:
-                archive_artifacts(db, projects, args.strategy)
+                remove_artifacts(db, projects, args.strategy)
     else:
         raise Exception("Command {} not implemented".format(args.command))
 
