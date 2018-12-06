@@ -1,7 +1,25 @@
 import psycopg2
 import psycopg2.extras
+import yaml
 
-from .errors import NoProjectError
+from .errors import NoProjectError, InvalidCIConfigError
+
+GITLAB_CI_RESERVED = [
+    'image',
+    'services',
+    'stages',
+    'types',
+    'before_script',
+    'after_script',
+    'variables',
+    'cache',
+    ]
+
+def ishidden(name):
+    return name.startswith('.')
+
+def isreserved(name):
+    return name in GITLAB_CI_RESERVED
 
 class Project(object):
     def __init__(self, id, path, storage):
@@ -10,7 +28,51 @@ class Project(object):
         self.full_path = path
         self.disk_path = self.full_path + '.git'
         self.gl_repository = 'project-{}'.format(id)
-        self.projects = None
+        self.branches = []
+
+    def add_branch(self, name, commit):
+        branch = Branch(self, name, commit)
+        self.branches.append(branch)
+
+        return branch
+
+    def tree_path(self, ref):
+        return '{}/tree/{}'.format(
+            self.full_path,
+            ref.name if isinstance(ref, Ref) else ref,
+            )
+
+class Ref(object):
+    def __init__(self, project, name, commit):
+        self.project = project
+        self.name = name
+        self.commit = commit
+
+    def tree_path(self):
+        return self.project.tree_path(self)
+
+class Branch(Ref):
+    def __init__(self, project, name, commit):
+        self.job_names = []
+
+        super().__init__(project, name, commit)
+
+    def load_ci_config(self, config_data):
+        try:
+            config = yaml.safe_load(config_data)
+        except yaml.YAMLError as e:
+            raise InvalidCIConfigError(self)
+
+        jobs = list(filter(
+            lambda key: not ishidden(key) and not isreserved(key),
+            config.keys()
+            ))
+
+        # gitlab-ci.yml must have at least one job
+        if not jobs:
+            raise InvalidCIConfigError(self)
+
+        self.job_names = jobs
 
 def get_project(db, path, parent_id):
     project = None
@@ -21,7 +83,7 @@ def get_project(db, path, parent_id):
             project = cur.fetchone()
 
     if not project:
-        raise NoProjectError
+        raise NoProjectError(path)
 
     return project
 
@@ -32,10 +94,7 @@ def get_namespace_id(db, path_component, parent_id):
             cur.execute(Query.get_namespace, dict(path=path_component, parent_id=parent_id))
             ns = cur.fetchone()
 
-    if not ns:
-        raise NoProjectError
-
-    return ns[0]
+    return ns[0] if ns else None
 
 def walk_namespaces(db, namespaces, project_path, parent_id=None):
     if not namespaces:
@@ -43,19 +102,21 @@ def walk_namespaces(db, namespaces, project_path, parent_id=None):
 
     ns_path = namespaces.pop(0)
     ns_id = get_namespace_id(db, ns_path, parent_id)
+    if not ns_id:
+        raise GitlabArtifactsError('No namespace "{}"'.format(nspath))
 
     return walk_namespaces(db, namespaces, project_path, ns_id)
 
 def find_project(db, full_path):
     namespaces = full_path.split('/')
-    if not namespaces:
-        raise NoProjectError
-
-    project_path = namespaces.pop()
-    id, storage = walk_namespaces(
-            db,
-            namespaces,
-            project_path)
+    try:
+        project_path = namespaces.pop()
+        id, storage = walk_namespaces(
+                db,
+                namespaces,
+                project_path)
+    except:
+        raise NoProjectError(full_path)
 
     return Project(
             id,

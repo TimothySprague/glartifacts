@@ -1,3 +1,5 @@
+import functools
+
 def indent(val, amount=2):
     if not val:
         return val
@@ -53,3 +55,24 @@ def humanize_size(size):
 
 def humanize_datetime(datetime):
     return datetime.date().isoformat() + " " + datetime.strftime('%X')
+
+def memoize(key=None):
+    def decorator(func):
+        cache = {}
+
+        @functools.wraps(func)
+        def cacheable(*args):
+            # reduce arguments using cache key callable
+            cache_args = key(args) if key else args
+
+            cache_key = '|'.join([str(a) for a in cache_args])
+            if cache_key in cache:
+                return cache[cache_key]
+
+            result = func(*args)
+            cache[cache_key] = result
+            return result
+
+        return cacheable
+
+    return decorator

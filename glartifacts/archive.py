@@ -27,23 +27,29 @@ class ArchiveStrategy(enum.Enum):
 
 def _load_project_branches(cursor, projects):
     cursor.execute(
-        "create temp table __project_branches (id int, ref varchar) on commit drop"
+        "create temp table "
+        "__project_branch_jobs (id int, ref varchar, job varchar) "
+        "on commit drop"
         )
 
-    # Get a flattened list of (id, ref) tuples
+    # Get a flattened list of tab-delimited (project_id, branch_name, job_name) tuples
     items = map(
-        lambda p: ['{}\t{}\n'.format(p.id, branch) for branch in p.branches],
+        lambda p: [
+            '{}\t{}\t{}\n'.format(p.id, branch.name, job_name)
+            for branch in p.branches
+            for job_name in branch.job_names
+            ],
         projects.values()
         )
     items = itertools.chain.from_iterable(items)
 
-    # psql copy_from requires a tab-delimited value
+    # psql copy_from requires a tab-delimited fileobj one row per-line
     data = io.StringIO()
     for row in items:
         data.write(row)
     data.seek(0)
 
-    cursor.copy_from(data, '__project_branches', columns=('id', 'ref'))
+    cursor.copy_from(data, '__project_branch_jobs', columns=('id', 'ref', 'job'))
 
 def get_archive_strategy_query(strategy):
     if strategy == ArchiveStrategy.LASTGOOD_JOB:
@@ -87,7 +93,7 @@ from (
     select b.project_id, b.name, b.ref,
             max(p.created_at) as pipeline_date
     from ci_builds as b
-    join __project_branches as pb on pb.id=b.project_id
+    join __project_branch_jobs as pbj on pbj.id=b.project_id
     join ci_stages as s on s.id=b.stage_id
     join ci_pipelines as p on p.id=s.pipeline_id
     where {}
@@ -118,11 +124,12 @@ join ci_builds as b on b.project_id=lastgood.project_id and b.name=lastgood.name
 join ci_stages as s on s.id=b.stage_id
 join ci_pipelines as p on p.id=s.pipeline_id
 join ci_job_artifacts as a on a.job_id=b.id
-left join __project_branches as pb on pb.id=b.project_id and pb.ref=b.ref
+left join __project_branch_jobs as pbj
+    on pbj.id=b.project_id and pbj.ref=b.ref and pbj.job=b.name
 where (
         p.created_at<lastgood.pipeline_date or
         (p.created_at=lastgood.pipeline_date and b.created_at<lastgood.build_date)
-        or pb.id is NULL
+        or pbj.id is NULL
     )
     and b.tag = false
     and b.artifacts_expire_at is null

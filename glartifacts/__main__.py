@@ -9,11 +9,11 @@ import psycopg2
 
 from . import log
 from .config import load_config
-from .errors import GitlabArtifactsError
+from .errors import GitlabArtifactsError, NoProjectError, InvalidCIConfigError
 from .gitaly import GitalyClient
 from .projects import find_project, list_projects, list_artifacts
 from .archive import list_archive_artifacts, archive_artifacts, ArchiveStrategy
-from .utils import tabulate, humanize_datetime, humanize_size
+from .utils import tabulate, humanize_datetime, humanize_size, memoize
 from .version import __version__
 
 def switch_user():
@@ -21,11 +21,55 @@ def switch_user():
     os.setgid(gluser.pw_gid)
     os.setuid(gluser.pw_uid)
 
+@memoize(
+    key=lambda args: (args[1].project.id, args[1].commit,) # memoize over project_id and commit
+    )
+def get_ci_config(gitaly, branch):
+    oid, size, data = gitaly.get_tree_entry(
+        branch,
+        '.gitlab-ci.yml',
+        )
+
+    # Gitaly returns an empty response if not found
+    if not oid:
+        return None
+
+    return data
+
 def resolve_projects(db, gitaly, project_paths):
     projects = {}
+    ci_config = {}
     for project_path in project_paths:
-        project = find_project(db, project_path)
-        project.branches = gitaly.get_branches(project)
+        try:
+            project = find_project(db, project_path)
+
+            # Load branches
+            branches = gitaly.get_branches(project)
+            for name, commit in branches:
+                branch = project.add_branch(name, commit)
+
+                # Load branch jobs via .gitlab-ci.yml
+                config_data = get_ci_config(gitaly, branch)
+                if not config_data:
+                    # No config for this branch means CI has been turned off
+                    log.warn('No .gitlab-ci.yml for {}'.format(
+                            branch.tree_path()
+                            )
+                        )
+                else:
+                    branch.load_ci_config(config_data)
+
+                    if not branch.job_names:
+                        log.warn('No jobs found in .gitlab-ci.yml for {}'.format(
+                                branch.tree_path()
+                                )
+                            )
+        except (NoProjectError, InvalidCIConfigError) as e:
+            # Continue loading projects even if a single project fails
+            log.warn('Skipping {}. Reason: {}'.format(project_path, str(e)))
+            log.debug(traceback.format_exc())
+            continue
+
         projects[project.id] = project
 
     return projects
@@ -141,15 +185,19 @@ def show_artifacts(projects, artifacts, scope, short_format=False, strategy=None
         ])
 
 def run_command(db, gitaly, args):
+    projects = []
+    if args.projects:
+        projects = resolve_projects(db, gitaly, args.projects)
+        if not projects:
+            raise GitlabArtifactsError('No valid projects specified')
+
     if args.command == 'list':
-        if args.projects:
-            projects = resolve_projects(db, gitaly, args.projects)
+        if projects:
             artifacts = list_artifacts(db, projects.keys())
             show_artifacts(projects, artifacts, "artifacts", args.short)
         else:
             show_projects(db, args.short)
     elif args.command == 'archive':
-        projects = resolve_projects(db, gitaly, args.projects)
         if args.dry_run:
             artifacts = list_archive_artifacts(
                 db,
