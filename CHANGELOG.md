@@ -1,3 +1,10 @@
+# v2.0.0
+* Rename the archive command to remove. It's a more accurate verb.
+* Make LASTGOOD_PIPELINE the default strategy
+* Parse the GitLab CI configuration file to ensure artifacts are removed when
+a job is renamed or removed.
+* Update psycopg2 package version for Python 3.7 support
+
 # v1.2.2
 * Fix `glartifacts list` when running on old GitLab installations
 
