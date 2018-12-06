@@ -1,3 +1,6 @@
+# v1.2.2
+* Fix `glartifacts list` when running on old GitLab installations
+
 # v1.2.1
 * Rename `LASTGOOD_BUILD` to `LASTGOOD_JOB`. This is consistent with GitLab's modern
 vocabulary (jobs, not builds)
