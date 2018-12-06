@@ -117,8 +117,8 @@ def get_args():
         '-s', '--strategy',
         type=ArchiveStrategy.parse,
         choices=list(ArchiveStrategy),
-        default=ArchiveStrategy.LASTGOOD_JOB,
-        help='select the archive strategy used to identify old artifacts (default: LASTGOOD_JOB)',
+        default=ArchiveStrategy.LASTGOOD_PIPELINE,
+        help='select the archive strategy used to identify old artifacts (default: LASTGOOD_PIPELINE)',
         )
     args = parser.parse_args()
     if not args.command:
