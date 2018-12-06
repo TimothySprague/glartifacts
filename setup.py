@@ -21,7 +21,7 @@ setuptools.setup(
         ]
     },
     install_requires=[
-        'psycopg2==2.6',
+        'psycopg2>=2.6',
         'protobuf>=3.6.1',
         'grpcio>=1.15.0',
     ],
