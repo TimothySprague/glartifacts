@@ -68,8 +68,9 @@ optional arguments:
                         changes
   -s {LASTGOOD_JOB,LASTGOOD_PIPELINE}, --strategy {LASTGOOD_JOB,LASTGOOD_PIPELINE}
                         select the archive strategy used to identify old
-                        artifacts (default: LASTGOOD_JOB)
+                        artifacts (default: LASTGOOD_PIPELINE)
 ```
+
 The `--strategy` option selects the heuristic used to identify expired
 artifacts. An archive strategy determines a point in time where artifacts are
 known to be good. Artifacts before that point-in-time are removed. Tagged
