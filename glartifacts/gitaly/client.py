@@ -6,6 +6,7 @@ from .proto import (
     blob_pb2, blob_pb2_grpc,
     )
 from .proto import shared_pb2
+from ..errors import GitlabArtifactsError
 
 GITALY_ADDR = 'unix:/var/opt/gitlab/gitaly/gitaly.socket'
 
