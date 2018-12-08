@@ -2,7 +2,7 @@ import psycopg2
 import psycopg2.extras
 import yaml
 
-from .errors import NoProjectError, InvalidCIConfigError
+from .errors import GitlabArtifactsError, NoProjectError, InvalidCIConfigError
 
 GITLAB_CI_RESERVED = [
     'image',
@@ -22,8 +22,8 @@ def isreserved(name):
     return name in GITLAB_CI_RESERVED
 
 class Project(object):
-    def __init__(self, id, path, storage):
-        self.id = id
+    def __init__(self, project_id, path, storage):
+        self.id = project_id
         self.storage = storage
         self.full_path = path
         self.disk_path = self.full_path + '.git'
@@ -60,7 +60,7 @@ class Branch(Ref):
     def load_ci_config(self, config_data):
         try:
             config = yaml.safe_load(config_data)
-        except yaml.YAMLError as e:
+        except yaml.YAMLError:
             raise InvalidCIConfigError(self)
 
         jobs = list(filter(
@@ -103,7 +103,7 @@ def walk_namespaces(db, namespaces, project_path, parent_id=None):
     ns_path = namespaces.pop(0)
     ns_id = get_namespace_id(db, ns_path, parent_id)
     if not ns_id:
-        raise GitlabArtifactsError('No namespace "{}"'.format(nspath))
+        raise GitlabArtifactsError('No namespace "{}"'.format(ns_path))
 
     return walk_namespaces(db, namespaces, project_path, ns_id)
 
@@ -111,29 +111,24 @@ def find_project(db, full_path):
     namespaces = full_path.split('/')
     try:
         project_path = namespaces.pop()
-        id, storage = walk_namespaces(
-                db,
-                namespaces,
-                project_path)
+        project_id, storage = walk_namespaces(
+            db,
+            namespaces,
+            project_path
+            )
     except:
         raise NoProjectError(full_path)
 
     return Project(
-            id,
-            full_path,
-            storage
-            )
+        project_id,
+        full_path,
+        storage
+        )
 
 def list_projects(db):
     with db:
         with db.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
             cur.execute(Query.projects_with_artifacts)
-            return cur.fetchall()
-
-def list_artifacts(db, project_ids):
-    with db:
-        with db.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
-            cur.execute(Query.get_artifacts, dict(project_id=tuple(project_ids)))
             return cur.fetchall()
 
 class Query():
@@ -154,18 +149,6 @@ inner join projects as p on p.id=a.project_id
 left join ns_paths as n on p.namespace_id=n.id
 where a.file_type <> 3
 group by a.project_id, p.path, n.path
-"""
-
-    get_artifacts = """
-select p.id as pipeline_id, coalesce(a.size, 0) as size, b.name, b.id as job_id, b.status,
-    b.tag, b.ref,
-    p.created_at as scheduled_at, b.created_at as built_at,
-    b.artifacts_expire_at as expire_at
-from ci_job_artifacts as a
-inner join ci_builds as b on b.id=a.job_id
-inner join ci_stages as s on s.id=b.stage_id
-inner join ci_pipelines as p on p.id=s.pipeline_id
-where a.project_id IN %(project_id)s and a.file_type=1
 """
 
     get_namespace = """

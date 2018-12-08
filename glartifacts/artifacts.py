@@ -1,12 +1,22 @@
 import enum
 import io
 import itertools
-
 import psycopg2
 import psycopg2.extras
 
 from . import log
 from .utils import indent
+
+class ArtifactDisposition(enum.Enum):
+    TAGGED = 1
+    EXPIRING = 2
+    ORPHANED = 3
+    LASTGOOD = 4
+    OLD = 5
+    NEW = 6
+
+    def __str__(self):
+        return str(self.name).lower()
 
 class ExpirationStrategy(enum.Enum):
     # Keep good artifacts per-job
@@ -59,11 +69,14 @@ def get_removal_strategy_query(strategy):
 
     raise Exception("Strategy {} not implemented".format(strategy.name))
 
-def list_remove_artifacts(db, projects, strategy):
+def list_artifacts(db, projects, strategy, remove_only=False):
     strategy_query = get_removal_strategy_query(strategy)
-    action_query = Query.artifact_list.format(Query.identify_artifacts)
+    action_query = Query.artifact_list.format(
+        Query.artifact_definition,
+        Query.identify_artifacts if remove_only else ''
+        )
     sql = strategy_query + action_query
-    log.debug("Running %s list remove artifacts query:\n  %s", strategy.name, indent(sql))
+    log.debug("Running %s list artifacts query:\n  %s", strategy.name, indent(sql))
 
     with db:
         with db.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
@@ -73,7 +86,10 @@ def list_remove_artifacts(db, projects, strategy):
 
 def remove_artifacts(db, projects, strategy):
     strategy_query = get_removal_strategy_query(strategy)
-    action_query = Query.artifact_expire.format(Query.identify_artifacts)
+    action_query = Query.artifact_expire.format(
+        Query.artifact_definition,
+        Query.identify_artifacts,
+        )
 
     sql = strategy_query + action_query
     log.debug("Running %s remove artifacts query:\n  %s", strategy.name, indent(sql))
@@ -107,48 +123,91 @@ group by lg.project_id, lg.name, lg.ref, lg.pipeline_date
 )
 """
 
+    # An artifact is old if it was created prior to the lastgood point in time
+    artifact_is_old = """
+(p.created_at<lastgood.pipeline_date or
+(p.created_at=lastgood.pipeline_date and b.created_at<lastgood.build_date))
+"""
+
+    # An artifact is lastgood if it's pipeline date and build_date match lastgood
+    artifact_is_lastgood = """
+(p.created_at=lastgood.pipeline_date and b.created_at=lastgood.build_date)
+"""
+
+    # An artifact is orphan if it's branch or job have been removed
+    artifact_is_orphan = """
+(pbj.id is NULL)
+"""
+
     # Criteria that define "good" for Job or Pipeline
     good_job = "(b.status='success' or b.allow_failure)"
     good_pipeline = "(p.status='success')"
 
-    # Identifies old artifacts based on a lastgood strategy
-    # "old" is defined as:
+    # Set of artifacts for a list operation
+    # NOTE: lastgood is left-joined, so comparisons within artifact_is
+    #       terms return null rather than true or false if there is no
+    #       lastgood point-in-time. In psql, null is not true, so it
+    #       works fine. Adding coalesce is mathmatically correct, but
+    #       may confuse the optimizer.
+    artifact_definition = """
+from ci_builds as b
+join ci_stages as s on s.id=b.stage_id
+join ci_pipelines as p on p.id=s.pipeline_id
+join ci_job_artifacts as a on a.job_id=b.id
+left join lastgood
+    on lastgood.project_id=b.project_id and lastgood.name=b.name
+        and lastgood.ref=b.ref
+left join __project_branch_jobs as pbj
+    on pbj.id=b.project_id and pbj.ref=b.ref and pbj.job=b.name
+where a.file_type = 1 and
+    b.project_id in (select distinct id from __project_branch_jobs)
+"""
+
+    # Identifies expired artifacts based on a lastgood strategy
+    # "expired" is defined as:
     #    Older than the lastgood pipeline OR
     #       older than the lastgood job within the lastgood pipeline
     #    Not tagged
     #    Not already expired
     #    Has artifacts file_type=1 (zip)
     identify_artifacts = """
-from lastgood
-join ci_builds as b on b.project_id=lastgood.project_id and b.name=lastgood.name and b.ref=lastgood.ref
-join ci_stages as s on s.id=b.stage_id
-join ci_pipelines as p on p.id=s.pipeline_id
-join ci_job_artifacts as a on a.job_id=b.id
-left join __project_branch_jobs as pbj
-    on pbj.id=b.project_id and pbj.ref=b.ref and pbj.job=b.name
-where (
-        p.created_at<lastgood.pipeline_date or
-        (p.created_at=lastgood.pipeline_date and b.created_at<lastgood.build_date)
-        or pbj.id is NULL
-    )
+    -- old or orphan
+    and ({} or {})
     and b.tag = false
     and b.artifacts_expire_at is null
     and a.file_type = 1
-"""
+""".format(
+    artifact_is_old,
+    artifact_is_orphan,
+    )
 
     # Wrapper that lists identified artifacts
     artifact_list = """
-select p.id as pipeline_id, coalesce(a.size, 0) as size, b.id as job_id, b.name, b.status,
-    b.tag, b.ref,
-    p.created_at as scheduled_at, b.created_at as built_at,
-    b.artifacts_expire_at as expire_at
-{}
-"""
+select p.project_id as project_id, p.id as pipeline_id, b.id as job_id,
+    p.created_at as scheduled_at,
+    b.name, b.status, b.ref,
+    coalesce(a.size, 0) as size,
+    case
+        when b.tag then 1
+        when b.artifacts_expire_at is not null then 2
+        when {} then 3 -- orphans
+        when {} then 4 -- lastgood
+        when {} then 5 -- old
+        else 6 -- new
+    end as disposition
+{{}}
+{{}}
+""".format(
+    artifact_is_orphan,
+    artifact_is_lastgood,
+    artifact_is_old,
+    )
 
     # Wrapper that sets artifact expiration on identified artifacts
     artifact_expire = """
 update ci_builds as target
 set artifacts_expire_at=(now() at time zone 'utc')
+{}
 {}
     and target.id=b.id
 """

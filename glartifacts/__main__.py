@@ -11,8 +11,8 @@ from . import log
 from .config import load_config
 from .errors import GitlabArtifactsError, NoProjectError, InvalidCIConfigError
 from .gitaly import GitalyClient
-from .projects import find_project, list_projects, list_artifacts
-from .artifacts import list_remove_artifacts, remove_artifacts, ExpirationStrategy
+from .projects import find_project, list_projects
+from .artifacts import list_artifacts, remove_artifacts, ExpirationStrategy, ArtifactDisposition
 from .utils import tabulate, humanize_datetime, humanize_size, memoize
 from .version import __version__
 
@@ -25,7 +25,7 @@ def switch_user():
     key=lambda args: (args[1].project.id, args[1].commit,) # memoize over project_id and commit
     )
 def get_ci_config(gitaly, branch):
-    oid, size, data = gitaly.get_tree_entry(
+    oid, _, data = gitaly.get_tree_entry(
         branch,
         '.gitlab-ci.yml',
         )
@@ -38,7 +38,6 @@ def get_ci_config(gitaly, branch):
 
 def resolve_projects(db, gitaly, project_paths):
     projects = {}
-    ci_config = {}
     for project_path in project_paths:
         try:
             project = find_project(db, project_path)
@@ -52,21 +51,18 @@ def resolve_projects(db, gitaly, project_paths):
                 config_data = get_ci_config(gitaly, branch)
                 if not config_data:
                     # No config for this branch means CI has been turned off
-                    log.warn('No .gitlab-ci.yml for {}'.format(
-                            branch.tree_path()
-                            )
-                        )
+                    log.warning('No .gitlab-ci.yml for %s', branch.tree_path())
                 else:
                     branch.load_ci_config(config_data)
 
                     if not branch.job_names:
-                        log.warn('No jobs found in .gitlab-ci.yml for {}'.format(
-                                branch.tree_path()
-                                )
+                        log.warning(
+                            'No jobs found in .gitlab-ci.yml for %s',
+                            branch.tree_path()
                             )
         except (NoProjectError, InvalidCIConfigError) as e:
             # Continue loading projects even if a single project fails
-            log.warn('Skipping {}. Reason: {}'.format(project_path, str(e)))
+            log.warning('Skipping %s. Reason: %s', project_path, str(e))
             log.debug(traceback.format_exc())
             continue
 
@@ -113,13 +109,19 @@ def get_args():
         '--dry-run',
         action="store_true",
         help='identify artifacts to be removed, but do not make any changes')
-    removecmd.add_argument(
-        '-s', '--strategy',
-        type=ExpirationStrategy.parse,
-        choices=list(ExpirationStrategy),
-        default=ExpirationStrategy.LASTGOOD_PIPELINE,
-        help='select the expiration strategy used to identify old artifacts (default: LASTGOOD_PIPELINE)',
-        )
+
+    # Add arguments shared by list and remove
+    for cmd in [listcmd, removecmd]:
+        cmd.add_argument(
+            '--strategy',
+            type=ExpirationStrategy.parse,
+            choices=list(ExpirationStrategy),
+            default=ExpirationStrategy.LASTGOOD_PIPELINE,
+            help=(
+                'select the expiration strategy used to identify old artifacts '
+                '(default: LASTGOOD_PIPELINE)'
+                ))
+
     args = parser.parse_args()
     if not args.command:
         parser.print_help()
@@ -142,7 +144,7 @@ def show_projects(db, short_format=False):
         print("\n".join(names))
         return
 
-    rows = [['Project', 'Id','Jobs with Artifacts']]
+    rows = [['Project', 'Id', 'Jobs with Artifacts']]
     for p in projects:
         rows.append([
             '/'.join((p['namespace'], p['project'])),
@@ -152,7 +154,10 @@ def show_projects(db, short_format=False):
     tabulate(rows, sortby=dict(key=lambda r: r[0]))
 
 def show_artifacts(projects, artifacts, scope, short_format=False, strategy=None):
-    project_names = ['{} #{}'.format(p.full_path, id) for id, p in projects.items()]
+    project_names = [
+        '{} #{}'.format(p.full_path, project_id)
+        for project_id, p in projects.items()
+        ]
     projects = ", ".join(sorted(project_names))
     if not len(artifacts):
         raise GitlabArtifactsError("No "+scope+" were found for "+projects)
@@ -166,26 +171,37 @@ def show_artifacts(projects, artifacts, scope, short_format=False, strategy=None
         print(" using", strategy, "strategy", end="")
     print("\n")
 
-    rows = [['Pipeline', 'Job', '', 'Scheduled At', 'Status', 'Ref', 'Tag?', 'Expiring?', 'Size']]
+    rows = [[
+        'Project',
+        'Pipeline',
+        'Job',
+        '',
+        'Ref',
+        'Scheduled At',
+        'Status',
+        'Artifacts',
+        'Size'
+        ]]
     for r in artifacts:
         rows.append([
+            '#'+str(r['project_id']),
             '#'+str(r['pipeline_id']),
             r['name'],
             '#'+str(r['job_id']),
+            r['ref'],
             humanize_datetime(r['scheduled_at']),
             r['status'],
-            r['ref'],
-            'yes' if r['tag'] else 'no',
-            'yes' if r['expire_at'] else 'no',
+            str(ArtifactDisposition(r['disposition'])),
             humanize_size(r['size'])
             ])
     tabulate(rows, sortby=[
-        dict(key=lambda r: (r[3]), reverse=True),
+        dict(key=lambda r: (r[4]), reverse=True),
+        dict(key=lambda r: (int(r[1][1:])), reverse=True),
         dict(key=lambda r: (int(r[0][1:])), reverse=True),
         ])
 
 def run_command(db, gitaly, args):
-    projects = []
+    projects = {}
     if args.projects:
         projects = resolve_projects(db, gitaly, args.projects)
         if not projects:
@@ -193,18 +209,27 @@ def run_command(db, gitaly, args):
 
     if args.command == 'list':
         if projects:
-            artifacts = list_artifacts(db, projects.keys())
+            artifacts = list_artifacts(
+                db,
+                projects,
+                strategy=args.strategy
+                )
             show_artifacts(projects, artifacts, "artifacts", args.short)
         else:
             show_projects(db, args.short)
     elif args.command == 'remove':
         if args.dry_run:
-            artifacts = list_remove_artifacts(
+            artifacts = list_artifacts(
                 db,
                 projects,
-                args.strategy
+                args.strategy,
+                remove_only=True,
                 )
-            show_artifacts(projects, artifacts, "expired artifacts", strategy=args.strategy)
+            show_artifacts(
+                projects,
+                artifacts,
+                "old or orphaned artifacts",
+                strategy=args.strategy)
         else:
             with db:
                 remove_artifacts(db, projects, args.strategy)
