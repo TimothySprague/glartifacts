@@ -45,7 +45,7 @@ def _load_project_branches(cursor, projects):
     # Get a flattened list of tab-delimited (project_id, branch_name, job_name) tuples
     items = map(
         lambda p: [
-            '{}\t{}\t{}\n'.format(p.id, branch.name, job_name)
+            '{}\t{}\t{}\n'.format(p.project_id, branch.name, job_name)
             for branch in p.branches
             for job_name in branch.job_names
             ],

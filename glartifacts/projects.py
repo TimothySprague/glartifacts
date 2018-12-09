@@ -23,11 +23,11 @@ def isreserved(name):
 
 class Project(object):
     def __init__(self, project_id, path, storage):
-        self.id = project_id
+        self.project_id = project_id
         self.storage = storage
         self.full_path = path
         self.disk_path = self.full_path + '.git'
-        self.gl_repository = 'project-{}'.format(id)
+        self.gl_repository = 'project-{}'.format(project_id)
         self.branches = []
 
     def add_branch(self, name, commit):

@@ -22,7 +22,8 @@ def switch_user():
     os.setuid(gluser.pw_uid)
 
 @memoize(
-    key=lambda args: (args[1].project.id, args[1].commit,) # memoize over project_id and commit
+    # memoize over project_id and commit
+    key=lambda args: (args[1].project.project_id, args[1].commit,)
     )
 def get_ci_config(gitaly, branch):
     oid, _, data = gitaly.get_tree_entry(
@@ -66,7 +67,7 @@ def resolve_projects(db, gitaly, project_paths):
             log.debug(traceback.format_exc())
             continue
 
-        projects[project.id] = project
+        projects[project.project_id] = project
 
     return projects
 
