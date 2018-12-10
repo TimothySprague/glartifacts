@@ -22,15 +22,19 @@ Commands:
 ### list
 Shows projects that contain build artifacts.
 ```
-usage: glartifacts list [-h] [-s]
+usage: glartifacts list [-h] [-a] [-e PROJECT [PROJECT ...]] [-s]
                         [--strategy {LASTGOOD_JOB,LASTGOOD_PIPELINE}]
                         [PROJECT [PROJECT ...]]
 
 positional arguments:
-  PROJECT               project path whose artifacts will be listed
+  PROJECT               paths to the projects whose artifacts should be listed
 
 optional arguments:
   -h, --help            show this help message and exit
+  -a, --all             list artifacts from all projects
+  -e PROJECT [PROJECT ...], --exclude PROJECT [PROJECT ...]
+                        paths to the projects whose artifacts should not by
+                        listed
   -s, --short           use a short list format that only prints project names
   --strategy {LASTGOOD_JOB,LASTGOOD_PIPELINE}
                         select the expiration strategy used to identify old
@@ -74,9 +78,9 @@ time. Expired artifacts will be removed when the next `Sidekiq` task is
 executed.
 
 ```
-usage: glartifacts remove [-h] [--dry-run]
+usage: glartifacts remove [-h] [--dry-run] [-a] [-e PROJECT [PROJECT ...]]
                           [--strategy {LASTGOOD_JOB,LASTGOOD_PIPELINE}]
-                          PROJECT [PROJECT ...]
+                          [PROJECT [PROJECT ...]]
 
 positional arguments:
   PROJECT               paths to the projects whose artifacts should be
@@ -86,6 +90,10 @@ optional arguments:
   -h, --help            show this help message and exit
   --dry-run             identify artifacts to be removed, but do not make any
                         changes
+  -a, --all             remove artifacts from all projects
+  -e PROJECT [PROJECT ...], --exclude PROJECT [PROJECT ...]
+                        paths to the projects whose artifacts should not be
+                        removed
   --strategy {LASTGOOD_JOB,LASTGOOD_PIPELINE}
                         select the expiration strategy used to identify old
                         artifacts (default: LASTGOOD_PIPELINE)

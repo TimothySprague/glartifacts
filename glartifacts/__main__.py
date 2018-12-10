@@ -37,8 +37,36 @@ def get_ci_config(gitaly, branch):
 
     return data
 
-def resolve_projects(db, gitaly, project_paths):
+def filter_projects(db, project_paths, all_projects, exclude_paths):
+    filtered_paths = project_paths
+
+    if all_projects:
+        filtered_paths = set([
+            '/'.join((p['namespace'], p['project']))
+            for p in list_projects(db)
+            ])
+
+    if exclude_paths:
+        s_projects = set(filtered_paths)
+        s_exclude = set(exclude_paths)
+
+        # Warn user if excluded projects look bogus
+        unused_excludes = s_exclude - s_projects
+        for exclude in unused_excludes:
+            log.warning(
+                'Excluded path %s was not in the set of projects',
+                exclude,
+                )
+
+        filtered_paths = s_projects - s_exclude
+
+    return filtered_paths
+
+def resolve_projects(db, gitaly, project_paths, all_projects=False, exclude_paths=None):
     projects = {}
+
+    project_paths = filter_projects(db, project_paths, all_projects, exclude_paths)
+
     for project_path in project_paths:
         try:
             project = find_project(db, project_path)
@@ -94,7 +122,17 @@ def get_args():
         "projects",
         metavar='PROJECT',
         nargs='*',
-        help='project path whose artifacts will be listed')
+        help='paths to the projects whose artifacts should be listed')
+    listcmd.add_argument(
+        '-a', '--all',
+        action='store_true',
+        help='list artifacts from all projects')
+    listcmd.add_argument(
+        '-e', '--exclude',
+        action='store',
+        nargs='+',
+        metavar='PROJECT',
+        help='paths to the projects whose artifacts should not by listed')
     listcmd.add_argument(
         '-s', '--short',
         action='store_true',
@@ -104,12 +142,22 @@ def get_args():
     removecmd.add_argument(
         'projects',
         metavar='PROJECT',
-        nargs='+',
+        nargs='*',
         help='paths to the projects whose artifacts should be removed')
     removecmd.add_argument(
         '--dry-run',
         action="store_true",
         help='identify artifacts to be removed, but do not make any changes')
+    removecmd.add_argument(
+        '-a', '--all',
+        action='store_true',
+        help='remove artifacts from all projects')
+    removecmd.add_argument(
+        '-e', '--exclude',
+        action='store',
+        nargs='+',
+        metavar='PROJECT',
+        help='paths to the projects whose artifacts should not be removed')
 
     # Add arguments shared by list and remove
     for cmd in [listcmd, removecmd]:
@@ -135,8 +183,14 @@ def get_args():
 
     return args
 
-def show_projects(db, short_format=False):
+def show_projects(db, short_format=False, exclude_paths=None):
     projects = list_projects(db)
+    if exclude_paths:
+        projects = [
+            p for p in projects
+            if not p['namespace']+'/'+p['project'] in exclude_paths
+            ]
+
     if not len(projects):
         raise GitlabArtifactsError("No projects were found with artifacts")
 
@@ -203,8 +257,15 @@ def show_artifacts(projects, artifacts, scope, short_format=False, strategy=None
 
 def run_command(db, gitaly, args):
     projects = {}
-    if args.projects:
-        projects = resolve_projects(db, gitaly, args.projects)
+
+    if args.projects or args.all:
+        projects = resolve_projects(
+            db,
+            gitaly,
+            project_paths=args.projects,
+            all_projects=args.all,
+            exclude_paths=args.exclude)
+
         if not projects:
             raise GitlabArtifactsError('No valid projects specified')
 
@@ -217,8 +278,11 @@ def run_command(db, gitaly, args):
                 )
             show_artifacts(projects, artifacts, "artifacts", args.short)
         else:
-            show_projects(db, args.short)
+            show_projects(db, args.short, args.exclude)
     elif args.command == 'remove':
+        if not projects:
+            raise GitlabArtifactsError('No valid projects specified')
+
         if args.dry_run:
             artifacts = list_artifacts(
                 db,
