@@ -30,6 +30,6 @@ class InvalidCIConfigError(GitlabArtifactsError):
     def __init__(self, ref):
         super().__init__(
             'Invalid .gitlab-ci.yml for "{}"'.format(
-                    ref.tree_path()
+                ref.tree_path()
                 )
             )
