@@ -1,3 +1,9 @@
+# v2.1.0
+* Add `--all` option to `list` and `remove` that runs the command on all projects
+* Add `--exclude` option to `list` and `remove` that excludes projects by path
+* Add artifact state column to improve the `list` and `remove --dry-run` output.
+* Fixed bugs caused by typos, missing imports, etc.
+
 # v2.0.0
 * Rename the archive command to remove. It's a more accurate verb.
 * Make LASTGOOD_PIPELINE the default strategy
