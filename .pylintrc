@@ -4,6 +4,10 @@
 ##    docstrings disabled temporarily
 disable=locally-disabled,too-few-public-methods,missing-docstring
 
+## pylint can't handle gprc.RpcError.
+## The strings checked by generated-members seem broken.
+generated-members=e\.code,e\.details
+
 [BASIC]
 
 ## I refuse to use ind, err, and fobj instead of i, e, and f

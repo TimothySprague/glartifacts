@@ -21,7 +21,7 @@ def ishidden(name):
 def isreserved(name):
     return name in GITLAB_CI_RESERVED
 
-class Project(object):
+class Project():
     def __init__(self, project_id, path, storage):
         self.project_id = project_id
         self.storage = storage
@@ -42,7 +42,7 @@ class Project(object):
             ref.name if isinstance(ref, Ref) else ref,
             )
 
-class Ref(object):
+class Ref():
     def __init__(self, project, name, commit):
         self.project = project
         self.name = name

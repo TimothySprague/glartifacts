@@ -64,7 +64,7 @@ def _load_project_branches(cursor, projects):
 def get_removal_strategy_query(strategy):
     if strategy == ExpirationStrategy.LASTGOOD_JOB:
         return Query.lastgood.format(Query.good_job)
-    elif strategy == ExpirationStrategy.LASTGOOD_PIPELINE:
+    if strategy == ExpirationStrategy.LASTGOOD_PIPELINE:
         return Query.lastgood.format(Query.good_pipeline)
 
     raise Exception("Strategy {} not implemented".format(strategy.name))

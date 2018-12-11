@@ -41,10 +41,10 @@ def filter_projects(db, project_paths, all_projects, exclude_paths):
     filtered_paths = project_paths
 
     if all_projects:
-        filtered_paths = set([
+        filtered_paths = {
             '/'.join((p['namespace'], p['project']))
             for p in list_projects(db)
-            ])
+            }
 
     if exclude_paths:
         s_projects = set(filtered_paths)
@@ -191,11 +191,11 @@ def show_projects(db, short_format=False, exclude_paths=None):
             if not p['namespace']+'/'+p['project'] in exclude_paths
             ]
 
-    if not len(projects):
+    if not projects:
         raise GitlabArtifactsError("No projects were found with artifacts")
 
     if short_format:
-        names = set(['/'.join((p['namespace'], p['project'])) for p in projects])
+        names = {'/'.join((p['namespace'], p['project'])) for p in projects}
         print("\n".join(names))
         return
 
@@ -214,11 +214,11 @@ def show_artifacts(projects, artifacts, scope, short_format=False, strategy=None
         for project_id, p in projects.items()
         ]
     projects = ", ".join(sorted(project_names))
-    if not len(artifacts):
+    if not artifacts:
         raise GitlabArtifactsError("No "+scope+" were found for "+projects)
 
     if short_format:
-        print("\n".join(set([r['name'] for r in artifacts])))
+        print("\n".join({r['name'] for r in artifacts}))
         return
 
     print("Listing", scope, "for", projects, end="")
