@@ -1,0 +1,6 @@
+image: !from_yaml .gitlab-ci.yml image
+
+aliases:
+  test:
+    script: !from_yaml .gitlab-ci.yml test.script
+
