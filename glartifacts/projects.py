@@ -19,9 +19,9 @@ def ishidden(name):
     return name.startswith('.')
 
 def isreserved(name):
-    return name in GITLAB_CI_RESERVED
+    return name.lower() in GITLAB_CI_RESERVED
 
-class Project(object):
+class Project():
     def __init__(self, project_id, path, storage):
         self.project_id = project_id
         self.storage = storage
@@ -42,7 +42,7 @@ class Project(object):
             ref.name if isinstance(ref, Ref) else ref,
             )
 
-class Ref(object):
+class Ref():
     def __init__(self, project, name, commit):
         self.project = project
         self.name = name
@@ -74,7 +74,7 @@ class Branch(Ref):
 
         self.job_names = jobs
 
-def get_project(db, path, parent_id):
+def _get_project(db, path, parent_id):
     project = None
 
     with db:
@@ -87,7 +87,7 @@ def get_project(db, path, parent_id):
 
     return project
 
-def get_namespace_id(db, path_component, parent_id):
+def _get_namespace_id(db, path_component, parent_id):
     ns = None
     with db:
         with db.cursor() as cur:
@@ -96,22 +96,22 @@ def get_namespace_id(db, path_component, parent_id):
 
     return ns[0] if ns else None
 
-def walk_namespaces(db, namespaces, project_path, parent_id=None):
+def _walk_namespaces(db, namespaces, project_path, parent_id=None):
     if not namespaces:
-        return get_project(db, project_path, parent_id)
+        return _get_project(db, project_path, parent_id)
 
     ns_path = namespaces.pop(0)
-    ns_id = get_namespace_id(db, ns_path, parent_id)
+    ns_id = _get_namespace_id(db, ns_path, parent_id)
     if not ns_id:
         raise GitlabArtifactsError('No namespace "{}"'.format(ns_path))
 
-    return walk_namespaces(db, namespaces, project_path, ns_id)
+    return _walk_namespaces(db, namespaces, project_path, ns_id)
 
 def find_project(db, full_path):
     namespaces = full_path.split('/')
     try:
         project_path = namespaces.pop()
-        project_id, storage = walk_namespaces(
+        project_id, storage = _walk_namespaces(
             db,
             namespaces,
             project_path

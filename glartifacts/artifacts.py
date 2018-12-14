@@ -58,19 +58,18 @@ def _load_project_branches(cursor, projects):
     for row in items:
         data.write(row)
     data.seek(0)
-
     cursor.copy_from(data, '__project_branch_jobs', columns=('id', 'ref', 'job'))
 
-def get_removal_strategy_query(strategy):
+def _get_removal_strategy_query(strategy):
     if strategy == ExpirationStrategy.LASTGOOD_JOB:
         return Query.lastgood.format(Query.good_job)
-    elif strategy == ExpirationStrategy.LASTGOOD_PIPELINE:
+    if strategy == ExpirationStrategy.LASTGOOD_PIPELINE:
         return Query.lastgood.format(Query.good_pipeline)
 
     raise Exception("Strategy {} not implemented".format(strategy.name))
 
 def list_artifacts(db, projects, strategy, remove_only=False):
-    strategy_query = get_removal_strategy_query(strategy)
+    strategy_query = _get_removal_strategy_query(strategy)
     action_query = Query.artifact_list.format(
         Query.artifact_definition,
         Query.identify_artifacts if remove_only else ''
@@ -85,7 +84,7 @@ def list_artifacts(db, projects, strategy, remove_only=False):
             return cur.fetchall()
 
 def remove_artifacts(db, projects, strategy):
-    strategy_query = get_removal_strategy_query(strategy)
+    strategy_query = _get_removal_strategy_query(strategy)
     action_query = Query.artifact_expire.format(
         Query.artifact_definition,
         Query.identify_artifacts,

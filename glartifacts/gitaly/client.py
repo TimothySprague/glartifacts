@@ -18,7 +18,7 @@ def _gitaly_repo(project):
         )
 
 
-class GitalyClient(object):
+class GitalyClient():
     def __init__(self, addr=GITALY_ADDR):
         self.addr = addr
         self._channel = None
@@ -61,7 +61,7 @@ class GitalyClient(object):
                 branch.target.id,
                 )
             branches.append(ref)
-        assert len(branches) > 0 # Safety check for failed requests
+        assert branches # Safety check for failed requests
 
         return branches
 

@@ -1,0 +1,18 @@
+image: registry.gitlab.com/haboustak/gitlab-artifact-tools/build-env:1.0
+stages:
+  - build
+  - test
+
+build:
+  stage: build
+  script:
+    - python3 setup.py sdist bdist_wheel
+  artifacts:
+    paths:
+      - dist
+
+test:
+  stage: test
+  script:
+    - pylint glartifacts --ignore proto
+    - su -c "python -m unittest -v" postgres

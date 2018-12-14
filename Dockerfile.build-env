@@ -1,0 +1,14 @@
+from python:3
+RUN DEBIAN_FRONTEND=noninteractive apt-get update \
+ && apt-get install -y \
+ 	postgresql \
+ && rm -rf /var/lib/apt/* /var/cache/apt/*
+
+RUN pip install \
+      pylint \
+      testing.postgresql \
+ && pip install \
+      'grpcio>=1.15.0' \
+      'protobuf>=3.6.1' \
+      'psycopg2>=2.6' \
+      'pyyaml>=3.11'
