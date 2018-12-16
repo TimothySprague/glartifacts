@@ -1,4 +1,4 @@
-image: registry.gitlab.com/haboustak/gitlab-artifact-tools/build-env:1.0
+image: registry.gitlab.com/haboustak/glartifacts/build-env:1.0
 stages:
   - build
   - test
