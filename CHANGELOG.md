@@ -1,3 +1,7 @@
+# v2.1.1
+* Add documentation hosted by readthedocs.io
+* First version available in PyPI
+
 # v2.1.0
 * Add `--all` option to `list` and `remove` that runs the command on all projects
 * Add `--exclude` option to `list` and `remove` that excludes projects by path

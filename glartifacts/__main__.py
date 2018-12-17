@@ -102,7 +102,7 @@ def resolve_projects(db, gitaly, project_paths, all_projects=False, exclude_path
 def get_args():
     parser = argparse.ArgumentParser(
         prog='glartifacts',
-        description='GitLab Artifact Tools')
+        description='Tools for managing GitLab artifacts')
     parser.add_argument(
         '-d', '--debug',
         action="store_true",
