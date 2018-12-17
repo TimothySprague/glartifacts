@@ -160,11 +160,11 @@ class TestProjects(unittest.TestCase):
             ]))
         lastgood = [artifacts_for_job(artifacts, a) for a in job_ids]
         self.assertEqual(len(job_ids), len(lastgood))
-        self.all_artifacts_are(lastgood, ArtifactDisposition.LASTGOOD)
+        self.all_artifacts_are(lastgood, ArtifactDisposition.GOOD)
 
         self.no_artifacts_are(
             artifacts,
-            ArtifactDisposition.LASTGOOD,
+            ArtifactDisposition.GOOD,
             exceptions=lastgood,
             )
 
@@ -181,11 +181,11 @@ class TestProjects(unittest.TestCase):
             ]))
         lastgood = [artifacts_for_job(artifacts, a) for a in job_ids]
         self.assertEqual(len(job_ids), len(lastgood))
-        self.all_artifacts_are(lastgood, ArtifactDisposition.LASTGOOD)
+        self.all_artifacts_are(lastgood, ArtifactDisposition.GOOD)
 
         self.no_artifacts_are(
             artifacts,
-            ArtifactDisposition.LASTGOOD,
+            ArtifactDisposition.GOOD,
             exceptions=lastgood,
             )
 

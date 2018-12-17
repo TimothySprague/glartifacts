@@ -11,7 +11,7 @@ class ArtifactDisposition(enum.Enum):
     TAGGED = 1
     EXPIRING = 2
     ORPHANED = 3
-    LASTGOOD = 4
+    GOOD = 4
     OLD = 5
     NEW = 6
 
