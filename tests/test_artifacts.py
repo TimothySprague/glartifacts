@@ -46,6 +46,8 @@ class TestProjects(unittest.TestCase):
             6: Project(6, 'boring-projects/carpenter_bees', 'default'),
             7: Project(7, 'awesome-people/no-gitlab-ci', 'default'),
             8: Project(8, 'awesome-people/no-artifacts', 'default'),
+            9: Project(9, 'open-source/main-project', 'default'),
+            10: Project(10, 'awesome-people/open-source/inner-project', 'default'),
             }
 
         # Add non-master, non-merged branches
@@ -63,13 +65,14 @@ class TestProjects(unittest.TestCase):
 
     def all_artifacts(self, strategy):
         projects = self._list_projects()
+
         artifacts = list_artifacts(
             self.db,
             projects,
             strategy,
             )
         self.assertIsNotNone(artifacts)
-        self.assertEqual(61, len(artifacts))
+        self.assertEqual(65, len(artifacts))
 
         return artifacts
 
@@ -153,7 +156,7 @@ class TestProjects(unittest.TestCase):
             )
 
         job_ids = list(itertools.chain(*[
-            [70],
+            [70, 72, 74],
             range(52, 55),
             [11, 12],
             [7,8],
@@ -174,7 +177,7 @@ class TestProjects(unittest.TestCase):
             )
 
         job_ids = list(itertools.chain(*[
-            [70],
+            [70,72,74],
             range(60,63),
             range(11, 14),
             [8],
@@ -195,7 +198,7 @@ class TestProjects(unittest.TestCase):
             )
 
         job_ids = list(itertools.chain(*[
-            [71],
+            [71,73,75],
             range(60,63),
             range(56,59),
             range(13,21)
@@ -216,7 +219,7 @@ class TestProjects(unittest.TestCase):
             )
 
         job_ids = list(itertools.chain(*[
-            [71],
+            [71,73,75],
             range(14,21)
             ]))
         new_artifacts = [artifacts_for_job(artifacts, a) for a in job_ids]

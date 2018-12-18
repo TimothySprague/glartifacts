@@ -46,6 +46,17 @@ class TestProjects(unittest.TestCase):
         self.assertEqual('project-3', project.gl_repository)
         self.assertFalse(project.branches)
 
+    def test_should_find_correct_namespace(self):
+        try:
+            project = find_project(
+                self.db,
+                'open-source/main-project'
+                )
+        except NoProjectError:
+            self.fail('find_project raised NoProjectError')
+
+        self.assertEqual(9, project.project_id)
+
     def test_should_not_list_no_artifacts_project(self):
         projects = list_projects(self.db)
         self.assertTrue(projects)
@@ -72,13 +83,15 @@ class TestProjects(unittest.TestCase):
 
     def test_should_list_artifact_count(self):
         artifact_counts = {
-            'awesome-prod': 33,
-            'other-cool.project.txt_': 20,
-            'awesome': 8
+            1: 33,
+            2: 20,
+            3: 8,
+            9: 2,
+            10: 2,
             }
         projects = list_projects(self.db)
         for p in projects:
-            self.assertEqual(artifact_counts[p[1]], p[3])
+            self.assertEqual(artifact_counts[p[0]], p[3])
 
     def test_should_ishidden(self):
         self.assertTrue(ishidden('._some_job'))

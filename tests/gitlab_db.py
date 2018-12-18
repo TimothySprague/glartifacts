@@ -67,7 +67,12 @@ def _insert_fixtures(cursor):
         "(2, 'go-further', 1), "
         "(3, 'into-the-future-of', 2), "
         "(4, 'cool-projects', NULL), "
-        "(5, 'boring-projects', NULL)"
+        "(5, 'boring-projects', NULL), "
+        "(6, 'open-source', 1),"
+        "(7, 'open-source', NULL)"
+        )
+    cursor.execute(
+        'cluster namespaces using namespaces_pkey'
         )
     cursor.execute(
         "insert into projects(id, path, namespace_id, repository_storage) values "
@@ -78,7 +83,9 @@ def _insert_fixtures(cursor):
         "(5, 'tunneling', 5, 'default'),"
         "(6, 'carpenter_bees', 5, 'default'),"
         "(7, 'no-gitlab-ci', 1, 'default'),"
-        "(8, 'no-artifacts', 1, 'default')"
+        "(8, 'no-artifacts', 1, 'default'),"
+        "(9, 'main-project', 7, 'default'),"
+        "(10, 'inner-project', 6, 'default')"
         )
 
     cursor.execute(
@@ -167,7 +174,13 @@ def _insert_fixtures(cursor):
         "(68,3,28, 'build', '9/1/2018 5:59:03AM', 'master',  false, 'success', false, NULL),"
         "(69,3,29, 'build', '9/1/2018 8:01:04AM', 'master',  false, 'success', false, NULL),"
         "(70,3,30, 'build', '9/1/2018 8:17:03AM', 'master',  false, 'success', false, NULL),"
-        "(71,3,31, 'build', '9/1/2018 9:08:04AM', 'master',  false, 'failed',  false, NULL)"
+        "(71,3,31, 'build', '9/1/2018 9:08:04AM', 'master',  false, 'failed',  false, NULL),"
+
+        # similar names
+        "(72,9,32, 'build', '9/1/2018 1:22:03AM', 'master',  false, 'success', false, NULL),"
+        "(73,9,33, 'build', '9/1/2018 2:13:04AM', 'master',  false, 'failed',  false, NULL),"
+        "(74,10,34,'build', '9/1/2018 1:22:03AM', 'master',  false, 'success', false, NULL),"
+        "(75,10,35,'build', '9/1/2018 2:13:04AM', 'master',  false, 'failed',  false, NULL)"
 
         )
 

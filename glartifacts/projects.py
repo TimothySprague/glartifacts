@@ -153,7 +153,7 @@ group by a.project_id, p.path, n.path
 
     get_namespace = """
 select id from namespaces where path=%(path)s and
-    (%(parent_id)s is null or parent_id=%(parent_id)s)
+    ((%(parent_id)s is null and parent_id is null) or parent_id=%(parent_id)s)
 """
 
     get_project = """
