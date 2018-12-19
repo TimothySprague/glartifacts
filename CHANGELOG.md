@@ -1,3 +1,6 @@
+# v2.1.2
+* Fixed a bug in namespace lookup when a namespace name was reused at multiple paths
+
 # v2.1.1
 * Add documentation hosted by readthedocs.io
 * First version available in PyPI
