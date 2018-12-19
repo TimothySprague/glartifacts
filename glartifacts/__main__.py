@@ -11,7 +11,7 @@ from . import log
 from .config import load_config
 from .errors import GitlabArtifactsError, NoProjectError, InvalidCIConfigError
 from .gitaly import GitalyClient
-from .projects import find_project, list_projects
+from .projects import find_project, list_projects, list_branches
 from .artifacts import list_artifacts, remove_artifacts, ExpirationStrategy, ArtifactDisposition
 from .utils import tabulate, humanize_datetime, humanize_size, memoize
 from .version import __version__
@@ -62,33 +62,51 @@ def filter_projects(db, project_paths, all_projects, exclude_paths):
 
     return filtered_paths
 
+def _load_branch_config(gitaly, branch, artifact_branches):
+    # Only print warnings for branches with artifacts
+    # that may be removed
+    has_artifacts = branch.name in artifact_branches
+
+    # Load branch jobs via .gitlab-ci.yml
+    config_data = get_ci_config(gitaly, branch)
+    if config_data:
+        branch.load_ci_config(config_data)
+
+        if not branch.job_names and has_artifacts:
+            log.warning(
+                'No jobs found in .gitlab-ci.yml for %s. '
+                'All artifacts will be removed.',
+                branch.tree_path()
+                )
+    elif has_artifacts:
+        # No config for this branch means CI has been turned off
+        log.warning(
+            'No .gitlab-ci.yml for %s. '
+            'All artifacts will be removed.',
+            branch.tree_path()
+            )
+
 def resolve_projects(db, gitaly, project_paths, all_projects=False, exclude_paths=None):
     projects = {}
 
     project_paths = filter_projects(db, project_paths, all_projects, exclude_paths)
 
+    project_artifact_branches = list_branches(db)
     for project_path in project_paths:
         try:
             project = find_project(db, project_path)
 
-            # Load branches
+            # Load git branches
             branches = gitaly.get_branches(project)
+            artifact_branches = project_artifact_branches.get(
+                project.project_id,
+                []
+                )
             for name, commit in branches:
                 branch = project.add_branch(name, commit)
 
-                # Load branch jobs via .gitlab-ci.yml
-                config_data = get_ci_config(gitaly, branch)
-                if not config_data:
-                    # No config for this branch means CI has been turned off
-                    log.warning('No .gitlab-ci.yml for %s', branch.tree_path())
-                else:
-                    branch.load_ci_config(config_data)
+                _load_branch_config(gitaly, branch, artifact_branches)
 
-                    if not branch.job_names:
-                        log.warning(
-                            'No jobs found in .gitlab-ci.yml for %s',
-                            branch.tree_path()
-                            )
         except (NoProjectError, InvalidCIConfigError) as e:
             # Continue loading projects even if a single project fails
             log.warning('Skipping %s. Reason: %s', project_path, str(e))
@@ -199,12 +217,13 @@ def show_projects(db, short_format=False, exclude_paths=None):
         print("\n".join(names))
         return
 
-    rows = [['Project', 'Id', 'Jobs with Artifacts']]
+    rows = [['Project', 'Id', 'Jobs with Artifacts', 'Total Size']]
     for p in projects:
         rows.append([
             '/'.join((p['namespace'], p['project'])),
             p['project_id'],
-            p['artifact_count']
+            p['artifact_count'],
+            humanize_size(p['artifact_size']),
             ])
     tabulate(rows, sortby=dict(key=lambda r: r[0]))
 

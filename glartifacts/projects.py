@@ -1,3 +1,4 @@
+import itertools
 import psycopg2
 import psycopg2.extras
 import yaml
@@ -131,6 +132,21 @@ def list_projects(db):
             cur.execute(Query.projects_with_artifacts)
             return cur.fetchall()
 
+def list_branches(db):
+    with db:
+        with db.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
+            cur.execute(Query.branches_with_artifacts)
+
+            # returns { project_id: [refs] }
+            # NOTE: rows must be sorted by project_id
+            return {
+                p: list(r['ref'] for r in b)
+                for p, b in itertools.groupby(
+                    cur.fetchall(),
+                    lambda b: b['project_id']
+                    )
+                }
+
 class Query():
     projects_with_artifacts = """
 with recursive ns_paths(id, parent_id, path) as (
@@ -143,12 +159,21 @@ with recursive ns_paths(id, parent_id, path) as (
         inner join ns_paths as p on p.id=c.parent_id
 )
 select a.project_id, p.path as project, n.path as namespace,
-    count(distinct a.job_id) as artifact_count
+    count(distinct a.job_id) as artifact_count,
+    sum(a.size) as artifact_size
 from ci_job_artifacts as a
 inner join projects as p on p.id=a.project_id
 left join ns_paths as n on p.namespace_id=n.id
 where a.file_type <> 3
 group by a.project_id, p.path, n.path
+"""
+
+    branches_with_artifacts = """
+select distinct a.project_id as project_id, b.ref
+from ci_job_artifacts as a
+inner join ci_builds as b on b.id=a.job_id
+where a.file_type <> 3
+order by a.project_id
 """
 
     get_namespace = """
