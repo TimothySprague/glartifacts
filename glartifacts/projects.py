@@ -1,9 +1,13 @@
 import itertools
+import traceback
+
 import psycopg2
 import psycopg2.extras
 import yaml
 
+from . import log
 from .errors import GitlabArtifactsError, NoProjectError, InvalidCIConfigError
+from .utils import memoize
 
 GITLAB_CI_RESERVED = [
     'image',
@@ -108,6 +112,71 @@ def _walk_namespaces(db, namespaces, project_path, parent_id=None):
 
     return _walk_namespaces(db, namespaces, project_path, ns_id)
 
+def _filter_projects(db, project_paths, all_projects, exclude_paths):
+    filtered_paths = project_paths
+
+    if all_projects:
+        filtered_paths = {
+            '/'.join((p['namespace'], p['project']))
+            for p in list_projects(db)
+            }
+
+    if exclude_paths:
+        s_projects = set(filtered_paths)
+        s_exclude = set(exclude_paths)
+
+        # Warn user if excluded projects look bogus
+        unused_excludes = s_exclude - s_projects
+        for exclude in unused_excludes:
+            log.warning(
+                'Excluded path %s was not in the set of projects',
+                exclude,
+                )
+
+        filtered_paths = s_projects - s_exclude
+
+    return filtered_paths
+
+@memoize(
+    # memoize over project_id and commit
+    key=lambda args: (args[1].project.project_id, args[1].commit,)
+    )
+def _get_ci_config(gitaly, branch):
+    oid, _, data = gitaly.get_tree_entry(
+        branch,
+        '.gitlab-ci.yml',
+        )
+
+    # Gitaly returns an empty response if not found
+    if not oid:
+        return None
+
+    return data
+
+def _load_branch_config(gitaly, branch, artifact_branches):
+    # Only print warnings for branches with artifacts
+    # that may be removed
+    has_artifacts = branch.name in artifact_branches
+
+    # Load branch jobs via .gitlab-ci.yml
+    config_data = _get_ci_config(gitaly, branch)
+    if config_data:
+        branch.load_ci_config(config_data)
+
+        if not branch.job_names and has_artifacts:
+            log.warning(
+                'No jobs found in .gitlab-ci.yml for %s. '
+                'All artifacts will be removed.',
+                branch.tree_path()
+                )
+    elif has_artifacts:
+        # No config for this branch means CI has been turned off
+        log.warning(
+            'No .gitlab-ci.yml for %s. '
+            'All artifacts will be removed.',
+            branch.tree_path()
+            )
+
 def find_project(db, full_path):
     namespaces = full_path.split('/')
     try:
@@ -146,6 +215,37 @@ def list_branches(db):
                     lambda b: b['project_id']
                     )
                 }
+
+def projects_from_paths(db, gitaly, project_paths, all_projects=False, exclude_paths=None):
+    projects = {}
+
+    project_paths = _filter_projects(db, project_paths, all_projects, exclude_paths)
+
+    project_artifact_branches = list_branches(db)
+    for project_path in project_paths:
+        try:
+            project = find_project(db, project_path)
+
+            # Load git branches
+            branches = gitaly.get_branches(project)
+            artifact_branches = project_artifact_branches.get(
+                project.project_id,
+                []
+                )
+            for name, commit in branches:
+                branch = project.add_branch(name, commit)
+
+                _load_branch_config(gitaly, branch, artifact_branches)
+
+        except (NoProjectError, InvalidCIConfigError) as e:
+            # Continue loading projects even if a single project fails
+            log.warning('Skipping %s. Reason: %s', project_path, str(e))
+            log.debug(traceback.format_exc())
+            continue
+
+        projects[project.project_id] = project
+
+    return projects
 
 class Query():
     projects_with_artifacts = """
