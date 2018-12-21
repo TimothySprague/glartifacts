@@ -264,7 +264,7 @@ select a.project_id, p.path as project, n.path as namespace,
 from ci_job_artifacts as a
 inner join projects as p on p.id=a.project_id
 left join ns_paths as n on p.namespace_id=n.id
-where a.file_type <> 3
+where a.file_type = 1
 group by a.project_id, p.path, n.path
 """
 
@@ -272,7 +272,7 @@ group by a.project_id, p.path, n.path
 select distinct a.project_id as project_id, b.ref
 from ci_job_artifacts as a
 inner join ci_builds as b on b.id=a.job_id
-where a.file_type <> 3
+where a.file_type = 1
 order by a.project_id
 """
 
