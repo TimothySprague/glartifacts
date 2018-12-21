@@ -1,8 +1,13 @@
+import itertools
+import traceback
+
 import psycopg2
 import psycopg2.extras
 import yaml
 
+from . import log
 from .errors import GitlabArtifactsError, NoProjectError, InvalidCIConfigError
+from .utils import memoize
 
 GITLAB_CI_RESERVED = [
     'image',
@@ -107,6 +112,71 @@ def _walk_namespaces(db, namespaces, project_path, parent_id=None):
 
     return _walk_namespaces(db, namespaces, project_path, ns_id)
 
+def _filter_projects(db, project_paths, all_projects, exclude_paths):
+    filtered_paths = project_paths
+
+    if all_projects:
+        filtered_paths = {
+            '/'.join((p['namespace'], p['project']))
+            for p in list_projects(db)
+            }
+
+    if exclude_paths:
+        s_projects = set(filtered_paths)
+        s_exclude = set(exclude_paths)
+
+        # Warn user if excluded projects look bogus
+        unused_excludes = s_exclude - s_projects
+        for exclude in unused_excludes:
+            log.warning(
+                'Excluded path %s was not in the set of projects',
+                exclude,
+                )
+
+        filtered_paths = s_projects - s_exclude
+
+    return filtered_paths
+
+@memoize(
+    # memoize over project_id and commit
+    key=lambda args: (args[1].project.project_id, args[1].commit,)
+    )
+def _get_ci_config(gitaly, branch):
+    oid, _, data = gitaly.get_tree_entry(
+        branch,
+        '.gitlab-ci.yml',
+        )
+
+    # Gitaly returns an empty response if not found
+    if not oid:
+        return None
+
+    return data
+
+def _load_branch_config(gitaly, branch, artifact_branches):
+    # Only print warnings for branches with artifacts
+    # that may be removed
+    has_artifacts = branch.name in artifact_branches
+
+    # Load branch jobs via .gitlab-ci.yml
+    config_data = _get_ci_config(gitaly, branch)
+    if config_data:
+        branch.load_ci_config(config_data)
+
+        if not branch.job_names and has_artifacts:
+            log.warning(
+                'No jobs found in .gitlab-ci.yml for %s. '
+                'All artifacts will be removed.',
+                branch.tree_path()
+                )
+    elif has_artifacts:
+        # No config for this branch means CI has been turned off
+        log.warning(
+            'No .gitlab-ci.yml for %s. '
+            'All artifacts will be removed.',
+            branch.tree_path()
+            )
+
 def find_project(db, full_path):
     namespaces = full_path.split('/')
     try:
@@ -131,6 +201,52 @@ def list_projects(db):
             cur.execute(Query.projects_with_artifacts)
             return cur.fetchall()
 
+def list_branches(db):
+    with db:
+        with db.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
+            cur.execute(Query.branches_with_artifacts)
+
+            # returns { project_id: [refs] }
+            # NOTE: rows must be sorted by project_id
+            return {
+                p: list(r['ref'] for r in b)
+                for p, b in itertools.groupby(
+                    cur.fetchall(),
+                    lambda b: b['project_id']
+                    )
+                }
+
+def projects_from_paths(db, gitaly, project_paths, all_projects=False, exclude_paths=None):
+    projects = {}
+
+    project_paths = _filter_projects(db, project_paths, all_projects, exclude_paths)
+
+    project_artifact_branches = list_branches(db)
+    for project_path in project_paths:
+        try:
+            project = find_project(db, project_path)
+
+            # Load git branches
+            branches = gitaly.get_branches(project)
+            artifact_branches = project_artifact_branches.get(
+                project.project_id,
+                []
+                )
+            for name, commit in branches:
+                branch = project.add_branch(name, commit)
+
+                _load_branch_config(gitaly, branch, artifact_branches)
+
+        except (NoProjectError, InvalidCIConfigError) as e:
+            # Continue loading projects even if a single project fails
+            log.warning('Skipping %s. Reason: %s', project_path, str(e))
+            log.debug(traceback.format_exc())
+            continue
+
+        projects[project.project_id] = project
+
+    return projects
+
 class Query():
     projects_with_artifacts = """
 with recursive ns_paths(id, parent_id, path) as (
@@ -143,12 +259,21 @@ with recursive ns_paths(id, parent_id, path) as (
         inner join ns_paths as p on p.id=c.parent_id
 )
 select a.project_id, p.path as project, n.path as namespace,
-    count(distinct a.job_id) as artifact_count
+    count(distinct a.job_id) as artifact_count,
+    sum(a.size) as artifact_size
 from ci_job_artifacts as a
 inner join projects as p on p.id=a.project_id
 left join ns_paths as n on p.namespace_id=n.id
 where a.file_type <> 3
 group by a.project_id, p.path, n.path
+"""
+
+    branches_with_artifacts = """
+select distinct a.project_id as project_id, b.ref
+from ci_job_artifacts as a
+inner join ci_builds as b on b.id=a.job_id
+where a.file_type <> 3
+order by a.project_id
 """
 
     get_namespace = """

@@ -1,10 +1,14 @@
 import psycopg2
 import unittest
+import warnings
 
+from unittest import mock
 from .gitlab_db import gitlab_db
 
+import glartifacts
 from glartifacts.projects import *
 from glartifacts.errors import NoProjectError
+from glartifacts.gitaly import GitalyClient
 
 def project_exists(projects, path):
     return path in [
@@ -16,6 +20,9 @@ class TestProjects(unittest.TestCase):
     def setUp(self):
         self.postgres = gitlab_db()
         self.db = psycopg2.connect(**self.postgres.dsn())
+
+        warnings.simplefilter('ignore', category=ImportWarning)
+        warnings.simplefilter('ignore', category=DeprecationWarning)
 
     def tearDown(self):
         self.postgres.stop()
@@ -135,3 +142,48 @@ class TestProjects(unittest.TestCase):
             project.tree_path('ab492cf81'),
             'boring-projects/tunneling/tree/ab492cf81'
             )
+
+    @mock.patch('glartifacts.gitaly.GitalyClient')
+    @mock.patch('glartifacts.projects._get_ci_config')
+    def test_should_warn_about_missing_config(self, ci_config_mock, gitaly_mock):
+        ci_config_mock.return_value = None
+        gitaly_mock.return_value.get_branches.return_value = [('master', 1)]
+        with mock.patch.object(log, 'warning'):
+            gitaly = glartifacts.gitaly.GitalyClient()
+            projects_from_paths(self.db, gitaly, ['awesome-people/awesome-prod'])
+
+            log.warning.assert_called_once()
+
+
+    @mock.patch('glartifacts.gitaly.GitalyClient')
+    @mock.patch('glartifacts.projects._get_ci_config')
+    def test_should_not_warn_about_missing_config(self, ci_config_mock, gitaly_mock):
+        ci_config_mock.return_value = None
+        gitaly_mock.return_value.get_branches.return_value = [('master', 1)]
+        with mock.patch.object(log, 'warning'):
+            gitaly = glartifacts.gitaly.GitalyClient()
+            projects_from_paths(self.db, gitaly, ['awesome-people/no-artifacts'])
+
+            log.warning.assert_not_called()
+
+    @mock.patch('glartifacts.gitaly.GitalyClient')
+    @mock.patch('glartifacts.projects._get_ci_config')
+    def test_should_warn_about_missing_job(self, ci_config_mock, gitaly_mock):
+        ci_config_mock.return_value = ''
+        gitaly_mock.return_value.get_branches.return_value = [('master', 1)]
+        with mock.patch.object(log, 'warning'):
+            gitaly = glartifacts.gitaly.GitalyClient()
+            projects_from_paths(self.db, gitaly, ['awesome-people/awesome-prod'])
+
+            log.warning.assert_called_once()
+
+    @mock.patch('glartifacts.gitaly.GitalyClient')
+    @mock.patch('glartifacts.projects._get_ci_config')
+    def test_should_not_warn_about_missing_job(self, ci_config_mock, gitaly_mock):
+        ci_config_mock.return_value = ''
+        gitaly_mock.return_value.get_branches.return_value = [('master', 1)]
+        with mock.patch.object(log, 'warning'):
+            gitaly = glartifacts.gitaly.GitalyClient()
+            projects_from_paths(self.db, gitaly, ['awesome-people/no-artifacts'])
+
+            log.warning.assert_not_called()
