@@ -121,15 +121,29 @@ def show_projects(db, short_format=False, exclude_paths=None):
         print("\n".join(names))
         return
 
-    rows = [['Project', 'Id', 'Jobs with Artifacts', 'Total Size']]
+    heading = ['Project', 'Id', 'Jobs with Artifacts', 'Total Size']
+    transforms = [
+        None,
+        lambda n: '#'+str(n) if n else '',
+        None,
+        humanize_size
+        ]
+    totals = [None]*2 + [sum, sum]
+    rows = []
     for p in projects:
         rows.append([
             '/'.join((p['namespace'], p['project'])),
             p['project_id'],
             p['artifact_count'],
-            humanize_size(p['artifact_size']),
+            p['artifact_size'],
             ])
-    tabulate(rows, sortby=dict(key=lambda r: r[0]))
+    tabulate(
+        heading,
+        rows,
+        display_transforms=transforms,
+        totals=totals,
+        sortby=dict(key=lambda r: r[0])
+        )
 
 def show_artifacts(projects, artifacts, scope, short_format=False, strategy=None):
     project_names = [
@@ -149,7 +163,7 @@ def show_artifacts(projects, artifacts, scope, short_format=False, strategy=None
         print(" using", strategy, "strategy", end="")
     print("\n")
 
-    rows = [[
+    heading = [
         'Project',
         'Pipeline',
         'Job',
@@ -159,24 +173,44 @@ def show_artifacts(projects, artifacts, scope, short_format=False, strategy=None
         'Status',
         'Artifacts',
         'Size'
-        ]]
+        ]
+    as_id = lambda num: '#'+str(num) if num else ''
+    transforms = [
+        as_id,
+        as_id,
+        None,
+        as_id,
+        None,
+        humanize_datetime,
+        None,
+        None,
+        humanize_size
+        ]
+    totals = [None]*8+[sum]
+    rows = []
     for r in artifacts:
         rows.append([
-            '#'+str(r['project_id']),
-            '#'+str(r['pipeline_id']),
+            r['project_id'],
+            r['pipeline_id'],
             r['name'],
-            '#'+str(r['job_id']),
+            r['job_id'],
             r['ref'],
-            humanize_datetime(r['scheduled_at']),
+            r['scheduled_at'],
             r['status'],
-            str(ArtifactDisposition(r['disposition'])),
-            humanize_size(r['size'])
+            ArtifactDisposition(r['disposition']),
+            r['size'],
             ])
-    tabulate(rows, sortby=[
-        dict(key=lambda r: (r[4]), reverse=True),
-        dict(key=lambda r: (int(r[1][1:])), reverse=True),
-        dict(key=lambda r: (int(r[0][1:])), reverse=True),
-        ])
+    tabulate(
+        heading,
+        rows,
+        display_transforms=transforms,
+        totals=totals,
+        sortby=[
+            dict(key=lambda r: r[4], reverse=True),
+            dict(key=lambda r: r[1], reverse=True),
+            dict(key=lambda r: r[0], reverse=True),
+            ]
+        )
 
 def run_command(db, gitaly, args):
     projects = {}

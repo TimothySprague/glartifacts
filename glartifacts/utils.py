@@ -6,21 +6,44 @@ def indent(val, amount=2):
     space = " "*amount
     return val.strip().replace("\n", "\n"+space)
 
-def tabulate(rows, sortby=None):
-    col_sizes = autosize(rows)
-    print_row(rows.pop(0), col_sizes)
+def tabulate(heading, rows, display_transforms=None, totals=None, sortby=None):
+    total_row = []
+    if totals:
+        for i, aggregate in enumerate(totals):
+            if not aggregate:
+                total_row.append('')
+                continue
+
+            total_row.append(aggregate(r[i] for r in rows))
+
     if 'key' in sortby:
         sortby = [sortby]
     for term in sortby:
         rows.sort(key=term['key'], reverse=term.get('reverse', False))
 
+    text_totals = transform_row(total_row, display_transforms)
+    text_rows = [transform_row(r, display_transforms) for r in rows]
+    col_sizes = autosize([heading]+text_rows+[text_totals])
+    print_row(heading, col_sizes)
     print_spacer(col_sizes)
-    for r in rows:
+    for r in text_rows:
         print_row(r, col_sizes)
+
+    if totals:
+        print_spacer(col_sizes)
+        print_row(text_totals, col_sizes)
+
+def transform_row(row, transforms):
+    text_row = []
+    for i, col in enumerate(row):
+        transform = (transforms[i] if transforms else None) or str
+        text_row.append(transform(col))
+
+    return text_row
 
 def print_row(row, col_sizes):
     for i, col in enumerate(row):
-        print(str(col).ljust(col_sizes[i]), end="")
+        print(col.ljust(col_sizes[i]), end="")
     print("")
 
 def print_spacer(col_sizes):
@@ -44,6 +67,9 @@ def autosize(rows):
     return sizes
 
 def humanize_size(size):
+    if not size:
+        return ''
+
     size_format = '{:.2f} {}'
     for unit in ['B', 'KiB', 'MiB']:
         if size < 1024:
@@ -54,6 +80,9 @@ def humanize_size(size):
     return size_format.format(size, "GiB")
 
 def humanize_datetime(datetime):
+    if not datetime:
+        return ''
+
     return datetime.date().isoformat() + " " + datetime.strftime('%X')
 
 def memoize(key=None):
