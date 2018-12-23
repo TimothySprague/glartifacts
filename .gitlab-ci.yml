@@ -14,5 +14,5 @@ build:
 test:
   stage: test
   script:
-    - pylint glartifacts --ignore proto
+    - pylint glartifacts --ignore proto -j 8
     - su -c "python -m unittest -v" postgres
