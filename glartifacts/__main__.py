@@ -166,11 +166,12 @@ def show_artifacts(projects, artifacts, scope, short_format=False, strategy=None
     heading = [
         'Project',
         'Pipeline',
+        'Status',
         'Job',
         '',
+        'Status',
         'Ref',
         'Scheduled At',
-        'Status',
         'Artifacts',
         'Size'
         ]
@@ -179,24 +180,26 @@ def show_artifacts(projects, artifacts, scope, short_format=False, strategy=None
         as_id,
         as_id,
         None,
+        None,
         as_id,
+        None,
         None,
         humanize_datetime,
         None,
-        None,
         humanize_size
         ]
-    totals = [None]*8+[sum]
+    totals = [None]*9+[sum]
     rows = []
     for r in artifacts:
         rows.append([
             r['project_id'],
             r['pipeline_id'],
+            r['pipeline_status'],
             r['name'],
             r['job_id'],
+            r['status'],
             r['ref'],
             r['scheduled_at'],
-            r['status'],
             ArtifactDisposition(r['disposition']),
             r['size'],
             ])
@@ -206,7 +209,7 @@ def show_artifacts(projects, artifacts, scope, short_format=False, strategy=None
         display_transforms=transforms,
         totals=totals,
         sortby=[
-            dict(key=lambda r: r[4], reverse=True),
+            dict(key=lambda r: r[6], reverse=True),
             dict(key=lambda r: r[1], reverse=True),
             dict(key=lambda r: r[0], reverse=True),
             ]
