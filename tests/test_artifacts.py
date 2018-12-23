@@ -20,13 +20,13 @@ def all_strategies():
         ]
 
 def artifacts_for_project(artifacts, project_id):
-    return [a for a in artifacts if a[0] == project_id]
+    return [a for a in artifacts if a['project_id'] == project_id]
 
 def artifacts_for_job(artifacts, job_id):
-    return next((a for a in artifacts if a[2] == job_id))
+    return next((a for a in artifacts if a['job_id'] == job_id))
 
 def artifacts_for_ref(artifacts, ref):
-    return [a for a in artifacts if a[6] == ref]
+    return [a for a in artifacts if a['ref'] == ref]
 
 class TestProjects(unittest.TestCase):
     def setUp(self):
@@ -80,9 +80,9 @@ class TestProjects(unittest.TestCase):
         for a in artifacts:
             self.assertEqual(
                 state,
-                ArtifactDisposition(a[8]),
+                ArtifactDisposition(a['disposition']),
                 'artifacts for job {} are not {}'.format(
-                    a[2],
+                    a['job_id'],
                     state
                     )
                 )
@@ -94,9 +94,9 @@ class TestProjects(unittest.TestCase):
 
             self.assertNotEqual(
                 state,
-                ArtifactDisposition(a[8]),
+                ArtifactDisposition(a['disposition']),
                 'artifacts for job {} are {}'.format(
-                    a[2],
+                    a['job_id'],
                     state
                     )
                 )
