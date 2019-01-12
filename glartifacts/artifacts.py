@@ -182,7 +182,8 @@ where a.file_type = 1 and
 
     # Wrapper that lists identified artifacts
     artifact_list = """
-select p.project_id as project_id, p.id as pipeline_id, b.id as job_id,
+select p.project_id as project_id, p.id as pipeline_id, p.status as pipeline_status,
+    b.id as job_id,
     p.created_at as scheduled_at,
     b.name, b.status, b.ref,
     coalesce(a.size, 0) as size,
