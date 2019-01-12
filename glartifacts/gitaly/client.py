@@ -43,25 +43,34 @@ class GitalyClient():
             repository=repository
             )
 
+        # Gitaly "chunks?" responses at 20 items
+        # https://tinyurl.com/ycuazk7w
         try:
-            response = list(self._refsvc.FindAllBranches(request))
-            assert len(response) == 1 # Shouldn't this be Unary?
+            for page in self._refsvc.FindAllBranches(request):
+                branches = []
+                for branch in page.branches:
+                    ref = (
+                        branch.name.decode('utf-8').split('/')[-1],
+                        branch.target.id,
+                        )
+                    branches.append(ref)
+
+                # Safety check for failed requests
+                if not branches:
+                    raise GitlabArtifactsError(
+                        'Gitaly returned no branches for {}'.format(
+                            project.full_path
+                            )
+                        )
+
         except grpc.RpcError as e:
             raise GitlabArtifactsError(
-                'RefSvc.FindAllBranches failed with error {}:{}'.format(
+                'RefSvc.FindAllBranches for {} failed with error {}:{}'.format(
+                    project.full_path,
                     e.code(),
                     e.details()
                     )
                 )
-
-        branches = []
-        for branch in response[0].branches:
-            ref = (
-                branch.name.decode('utf-8').split('/')[-1],
-                branch.target.id,
-                )
-            branches.append(ref)
-        assert branches # Safety check for failed requests
 
         return branches
 
@@ -78,6 +87,8 @@ class GitalyClient():
         try:
             # This should raise RpcError - on notfound, but it doesn't?
             response = list(self._commitsvc.TreeEntry(request))
+
+            # Note: I don't know how this response gets chunked
             assert len(response) == 1 # Shouldn't this be Unary?
         except grpc.RpcError as e:
             raise GitlabArtifactsError(
