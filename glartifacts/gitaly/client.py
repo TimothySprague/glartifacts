@@ -43,32 +43,31 @@ class GitalyClient():
             repository=repository
             )
 
-        # Gitaly "chunks?" responses at 20 items
-        # https://tinyurl.com/ycuazk7w
+        branches = []
         try:
+            # Gitaly "chunks?" responses at 20 items
+            # https://tinyurl.com/ycuazk7w
             for page in self._refsvc.FindAllBranches(request):
-                branches = []
                 for branch in page.branches:
                     ref = (
                         branch.name.decode('utf-8').split('/')[-1],
                         branch.target.id,
                         )
                     branches.append(ref)
-
-                # Safety check for failed requests
-                if not branches:
-                    raise GitlabArtifactsError(
-                        'Gitaly returned no branches for {}'.format(
-                            project.full_path
-                            )
-                        )
-
         except grpc.RpcError as e:
             raise GitlabArtifactsError(
                 'RefSvc.FindAllBranches for {} failed with error {}:{}'.format(
                     project.full_path,
                     e.code(),
                     e.details()
+                    )
+                )
+
+        # Safety check for failed requests
+        if not branches:
+            raise GitlabArtifactsError(
+                'Gitaly returned no branches for {}'.format(
+                    project.full_path
                     )
                 )
 
