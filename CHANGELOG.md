@@ -1,3 +1,6 @@
+# v2.2.1
+* Fix another bug loading branches for projects with more than 20 branches
+
 # v2.2
 * Reduce warnings for projects without CI or artifacts
 * Display totals for artifact size and count when listing artifacts
