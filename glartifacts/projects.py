@@ -260,7 +260,7 @@ with recursive ns_paths(id, parent_id, path) as (
 )
 select a.project_id, p.path as project, n.path as namespace,
     count(distinct a.job_id) as artifact_count,
-    sum(coalesce(a.size, 0)) as artifact_size
+    coalesce(sum(a.size), 0) as artifact_size
 from ci_job_artifacts as a
 inner join projects as p on p.id=a.project_id
 left join ns_paths as n on p.namespace_id=n.id
