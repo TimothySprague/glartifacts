@@ -74,6 +74,11 @@ class TestProjects(unittest.TestCase):
         self.assertTrue(projects)
         self.assertFalse(project_exists(projects, 'awesome-people/no-gitlab-ci'))
 
+    def test_should_sum_with_null_artifact_size(self):
+        projects = list_projects(self.db)
+        for p in projects:
+            self.assertIsNotNone(p['artifact_size'])
+
     def test_should_not_find_project_invalid_name(self):
         with self.assertRaises(NoProjectError):
             find_project(self.db, 'awesome-people/not-awesome')

@@ -430,3 +430,9 @@ class TestProjects(unittest.TestCase):
             ArtifactDisposition.EXPIRING,
             exceptions=expiring_artifacts,
             )
+
+    def test_all_artifacts_have_size(self):
+        for strategy in all_strategies():
+            artifacts = self.all_artifacts(strategy)
+            for a in artifacts:
+                self.assertIsNotNone(a['size'])
