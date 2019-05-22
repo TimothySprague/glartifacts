@@ -205,7 +205,8 @@ def _insert_fixtures(cursor):
     # create artifacs for each job
     cursor.execute(
         "insert into ci_job_artifacts "
-        "select b.id, p.project_id, b.id, 1 as file_type, 491286 as size "
+        "select b.id, p.project_id, b.id, 1 as file_type, "
+        "case when b.status='success' and b.project_id<>9 then 491286 else null end as size "
         "from ci_builds as b "
         "join ci_stages as c on c.id=b.stage_id "
         "join ci_pipelines as p on p.id=c.pipeline_id "
