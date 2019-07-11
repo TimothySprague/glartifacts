@@ -1,3 +1,9 @@
+# v2.2.2
+* Fixed a crash when loading artifacts for a project when all artifact sizes
+were null.
+* Correctly implemented Gitaly's GetTreeEntry RPC call. Files that span multiple
+response chunks are read properly.
+
 # v2.2.1
 * Fix another bug loading branches for projects with more than 20 branches
 
