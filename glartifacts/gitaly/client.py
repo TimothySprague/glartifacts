@@ -1,4 +1,3 @@
-import functools
 import grpc
 
 from .proto import (
@@ -108,7 +107,5 @@ class GitalyClient():
         return (
             first_entry.oid,
             first_entry.size,
-            functools.reduce(
-                lambda data, part: data+part, (entry.data for entry in response)
-                ),
+            b''.join(entry.data for entry in response)
             )
