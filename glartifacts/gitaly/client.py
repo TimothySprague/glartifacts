@@ -1,3 +1,4 @@
+import functools
 import grpc
 
 from .proto import (
@@ -75,7 +76,6 @@ class GitalyClient():
 
     def get_tree_entry(self, ref, path):
         repository = _gitaly_repo(ref.project)
-
         request = commit_pb2.TreeEntryRequest(
             repository=repository,
             revision=ref.commit.encode('utf-8'),
@@ -86,9 +86,6 @@ class GitalyClient():
         try:
             # This should raise RpcError - on notfound, but it doesn't?
             response = list(self._commitsvc.TreeEntry(request))
-
-            # Note: I don't know how this response gets chunked
-            assert len(response) == 1 # Shouldn't this be Unary?
         except grpc.RpcError as e:
             raise GitlabArtifactsError(
                 'CommitSvc.TreeEntry failed with error {}:{}'.format(
@@ -97,15 +94,21 @@ class GitalyClient():
                     )
                 )
 
-        entry = response[0]
+        # We should always get a response - it may be empty
+        if not response:
+            raise GitlabArtifactsError(
+                'CommitSvc.TreeEntry did not return a response')
 
-        # Ensure we receive type=BLOB, failed requests return type=COMMIT
-        blob = None
-        if entry.type == 1:
-            blob = (
-                entry.oid,
-                entry.size,
-                entry.data,
-                )
+        first_entry = response[0]
 
-        return blob if blob else (None,)*3
+        # Ensure the first entry is type=BLOB, failed requests return type=COMMIT
+        if first_entry.type != 1:
+            return (None,)*3
+
+        return (
+            first_entry.oid,
+            first_entry.size,
+            functools.reduce(
+                lambda data, part: data+part, (entry.data for entry in response)
+                ),
+            )
