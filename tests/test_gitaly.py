@@ -23,8 +23,8 @@ class TestGitaly(unittest.TestCase):
     def test_should_find_branches_with_slashes(self, mock_refsvc):
         mock_refsvc.return_value.FindAllBranches.return_value = [
                 self._make_branch_response([
-                    b'open-source/crazy-names/master',
-                    b'open-source/crazy-names/release/v2',
+                    b'refs/heads/master',
+                    b'refs/heads/release/v2',
                     ])
                 ]
 

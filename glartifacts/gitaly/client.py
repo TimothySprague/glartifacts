@@ -9,6 +9,7 @@ from .proto import shared_pb2
 from ..errors import GitlabArtifactsError
 
 GITALY_ADDR = 'unix:/var/opt/gitlab/gitaly/gitaly.socket'
+REF_PREFIX = 'refs/heads/'
 
 def _gitaly_repo(project):
     return shared_pb2.Repository(
@@ -37,6 +38,12 @@ class GitalyClient():
     def __exit__(self, *args):
         self._channel.close()
 
+    @staticmethod
+    def name_from_ref(ref):
+        if ref.lower().startswith(REF_PREFIX):
+            return ref[len(REF_PREFIX):]
+        return ref
+
     def get_branches(self, project):
         repository = _gitaly_repo(project)
         request = ref_pb2.FindAllBranchesRequest(
@@ -50,7 +57,7 @@ class GitalyClient():
             for page in self._refsvc.FindAllBranches(request):
                 for branch in page.branches:
                     ref = (
-                        branch.name.decode('utf-8').split('/')[-1],
+                        GitalyClient.name_from_ref(branch.name.decode('utf-8')),
                         branch.target.id,
                         )
                     branches.append(ref)
