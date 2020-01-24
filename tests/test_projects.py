@@ -100,6 +100,7 @@ class TestProjects(unittest.TestCase):
             3: 8,
             9: 2,
             10: 2,
+            11: 5,
             }
         projects = list_projects(self.db)
         for p in projects:

@@ -389,6 +389,36 @@ class TestProjects(unittest.TestCase):
             exceptions=expiring_artifacts,
             )
 
+    def test_crazy_branches_should_have_good_jobs(self):
+        projects = {
+            11: Project(11, 'open-source/crazy-names', 'default')
+            }
+        projects[11].add_branch('master', '1').job_names = ['build']
+        projects[11].add_branch('release/v2', '2').job_names = ['build']
+
+        artifacts = list_artifacts(
+            self.db,
+            projects,
+            ExpirationStrategy.LASTGOOD_PIPELINE,
+            )
+        self.assertEqual(5, len(artifacts))
+
+        old_jobs = [76,77]
+        good_jobs = [78,79]
+        new_jobs = [80]
+        self.all_artifacts_are(
+            [artifacts_for_job(artifacts, a) for a in old_jobs],
+            ArtifactDisposition.OLD,
+            )
+        self.all_artifacts_are(
+            [artifacts_for_job(artifacts, a) for a in good_jobs],
+            ArtifactDisposition.GOOD,
+            )
+        self.all_artifacts_are(
+            [artifacts_for_job(artifacts, a) for a in new_jobs],
+            ArtifactDisposition.NEW,
+            )
+
     def test_should_remove_lastgood_job_old_and_orphans(self):
         projects = self._list_projects()
         remove_artifacts(
