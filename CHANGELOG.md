@@ -1,3 +1,8 @@
+# v2.2.3
+* Branches that contain slashes now work correctly. Previously, any branch with
+a slash character (e.g. release/v2.2) would display as orphaned (as though the
+branch no longer existed).
+
 # v2.2.2
 * Fixed a crash when loading artifacts for a project when all artifact sizes
 were null.
