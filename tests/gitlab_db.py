@@ -85,7 +85,8 @@ def _insert_fixtures(cursor):
         "(7, 'no-gitlab-ci', 1, 'default'),"
         "(8, 'no-artifacts', 1, 'default'),"
         "(9, 'main-project', 7, 'default'),"
-        "(10, 'inner-project', 6, 'default')"
+        "(10, 'inner-project', 6, 'default'),"
+        "(11, 'crazy-names', 7, 'default')"
         )
 
     cursor.execute(
@@ -180,8 +181,14 @@ def _insert_fixtures(cursor):
         "(72,9,32, 'build', '9/1/2018 1:22:03AM', 'master',  false, 'success', false, NULL),"
         "(73,9,33, 'build', '9/1/2018 2:13:04AM', 'master',  false, 'failed',  false, NULL),"
         "(74,10,34,'build', '9/1/2018 1:22:03AM', 'master',  false, 'success', false, NULL),"
-        "(75,10,35,'build', '9/1/2018 2:13:04AM', 'master',  false, 'failed',  false, NULL)"
+        "(75,10,35,'build', '9/1/2018 2:13:04AM', 'master',  false, 'failed',  false, NULL),"
 
+        # special characters
+        "(76,11,36, 'build', '9/1/2018 1:22:03AM', 'release/v2',  false, 'success', false, NULL),"
+        "(77,11,37, 'build', '9/1/2018 1:29:03AM', 'release/v2',  false, 'success', false, NULL),"
+        "(78,11,38, 'build', '9/1/2018 2:20:03AM', 'release/v2',  false, 'success', false, NULL),"
+        "(79,11,39, 'build', '9/1/2018 1:22:03AM', 'master',  false, 'success', false, NULL),"
+        "(80,11,40, 'build', '9/1/2018 3:01:03AM', 'release/v2',  false, 'failed', false, NULL)"
         )
 
     # create a pipeline for each job
